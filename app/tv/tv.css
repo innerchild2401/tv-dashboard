@@ -1,0 +1,357 @@
+.tv-frame {
+  width: 100vw;
+  height: 100vh;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.tv-slot {
+  width: calc(1920px * var(--tv-scale, 1));
+  height: calc(1080px * var(--tv-scale, 1));
+}
+
+.tv-stage {
+  width: 1920px;
+  height: 1080px;
+  overflow: hidden;
+  transform: scale(var(--tv-scale, 1));
+  transform-origin: top left;
+  background: var(--bg);
+}
+
+.tv-canvas {
+  width: 1280px;
+  height: 720px;
+  transform: scale(1.5);
+  transform-origin: top left;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  gap: 14px;
+  padding: 22px 28px 16px;
+  animation: tv-shift 20min steps(1, end) infinite;
+}
+
+@keyframes tv-shift {
+  0% { transform: translate(0, 0) scale(1.5); }
+  25% { transform: translate(1px, 2px) scale(1.5); }
+  50% { transform: translate(2px, 0) scale(1.5); }
+  75% { transform: translate(0, 1px) scale(1.5); }
+}
+
+.tv-header,
+.weather,
+.agenda-head,
+.hero-top,
+.day-row,
+.pill {
+  display: flex;
+  align-items: center;
+}
+
+.tv-header {
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.clock {
+  margin: 0;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 56px;
+  font-weight: 700;
+  line-height: 0.9;
+  letter-spacing: -0.04em;
+}
+
+.date-label {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 16px;
+}
+
+.weather {
+  gap: 14px;
+}
+
+.weather-temp {
+  margin: 0;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 40px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.weather-meta {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.weather-meta span:first-child {
+  color: var(--text);
+  font-size: 16px;
+}
+
+.priority {
+  display: grid;
+  grid-template-columns: 4px 1fr;
+  gap: 14px;
+  align-items: center;
+  min-height: 64px;
+  padding: 10px 16px 10px 0;
+  background: var(--banner);
+  border-radius: 14px;
+}
+
+.priority-bar {
+  width: 4px;
+  height: 100%;
+  min-height: 44px;
+  border-radius: 4px;
+  background: var(--accent);
+}
+
+.kicker {
+  margin: 0;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.priority-text,
+.hero h2,
+.agenda-row p,
+.day-titles {
+  margin: 0;
+}
+
+.priority-text {
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.priority-reason,
+.lead-date,
+.empty {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.tv-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(280px, 0.8fr);
+  gap: 18px;
+  min-height: 0;
+}
+
+.agenda,
+.side {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.agenda-head,
+.hero-top {
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.agenda-head h2,
+.section-label {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.agenda-list,
+.day-list,
+.pills ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.agenda-list {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  overflow: hidden;
+}
+
+.agenda-row {
+  display: grid;
+  grid-template-columns: 78px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  min-height: 46px;
+  border-top: 1px solid var(--line);
+}
+
+.agenda-row time,
+.hero-time,
+.dwell {
+  font-family: "Space Grotesk", sans-serif;
+  font-weight: 500;
+}
+
+.agenda-row time {
+  font-size: 18px;
+}
+
+.agenda-row p {
+  font-size: 18px;
+}
+
+.agenda-row.past {
+  opacity: 0.4;
+}
+
+.agenda-row.current time,
+.agenda-row.current p {
+  color: var(--accent);
+}
+
+.now-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 0;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.now-line span {
+  height: 2px;
+  flex: 1;
+  background: var(--accent);
+}
+
+.person {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  font-size: 15px;
+}
+
+.person-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+}
+
+.side {
+  justify-content: space-between;
+}
+
+.hero,
+.days {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+}
+
+.hero {
+  padding: 18px 20px 20px;
+}
+
+.hero h2 {
+  margin-top: 8px;
+  font-size: 32px;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+
+.countdown {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 18px 0 8px;
+}
+
+.countdown-prefix {
+  color: var(--muted);
+  font-size: 18px;
+}
+
+.countdown strong {
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 44px;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  color: var(--accent);
+}
+
+.hero-time {
+  margin: 0;
+  color: var(--muted);
+  font-size: 16px;
+}
+
+.days {
+  padding: 14px 16px;
+}
+
+.day-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.day-row {
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 28px;
+}
+
+.day-label {
+  color: var(--muted);
+  font-size: 15px;
+}
+
+.day-titles {
+  text-align: right;
+  font-size: 16px;
+}
+
+.pills ol {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+.pill {
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 15px;
+}
+
+.pill.active {
+  background: #17232b;
+  color: var(--accent);
+}
+
+.dwell {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.tv-denied {
+  margin: 0;
+  font-size: 32px;
+  color: var(--muted);
+}
