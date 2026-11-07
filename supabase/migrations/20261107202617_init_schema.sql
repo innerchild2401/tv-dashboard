@@ -72,17 +72,6 @@ create table public.cards (
     grid_col >= 0 and grid_row >= 0 and grid_col_span >= 1 and grid_row_span >= 1
   ),
   constraint cards_external_id_key unique (external_id),
-  constraint cards_wins_evidence check (
-    kind <> 'wins'
-    or (
-      jsonb_typeof(data -> 'items') = 'array'
-      and not exists (
-        select 1
-        from jsonb_array_elements(data -> 'items') as item
-        where coalesce(item ->> 'evidence', '') = ''
-      )
-    )
-  ),
   constraint cards_progress_evidence check (
     kind <> 'progress' or coalesce(data ->> 'evidence', '') <> ''
   )
@@ -263,6 +252,33 @@ for each row execute function public.set_updated_at();
 create trigger ideas_set_updated_at
 before update on public.ideas
 for each row execute function public.set_updated_at();
+
+-- Postgres rejects subqueries in CHECK constraints, so wins evidence is enforced here.
+create or replace function public.cards_require_win_evidence()
+returns trigger
+language plpgsql
+as $$
+begin
+  if new.kind = 'wins' then
+    if jsonb_typeof(new.data -> 'items') is distinct from 'array'
+      or exists (
+        select 1
+        from jsonb_array_elements(new.data -> 'items') as item
+        where coalesce(item ->> 'evidence', '') = ''
+      )
+    then
+      raise exception 'wins cards require evidence on every item';
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+revoke all on function public.cards_require_win_evidence() from public, anon, authenticated;
+
+create trigger cards_require_win_evidence
+before insert or update on public.cards
+for each row execute function public.cards_require_win_evidence();
 
 do $$
 declare

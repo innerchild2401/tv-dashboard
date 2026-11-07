@@ -40,24 +40,13 @@ pnpm build
 
 Do not deploy, and do not run the seed against a hosted database, until those values are filled. No secret belongs in this repository.
 
-## What is not provisioned yet
+## Projects
 
-The Supabase project and the Vercel project are not created. This machine does not have the Supabase CLI or the Vercel CLI installed, and `SUPABASE_ACCESS_TOKEN` and `VERCEL_TOKEN` are not set. Do not paste tokens into chat. Install the CLIs, sign in, and continue from here:
+Supabase project `xbqcywzbykstjlnrrycl` is in Central EU (Frankfurt). The migration is applied: row level security is enabled on every table, there are no policies, `anon` and `authenticated` have no grants, and the `photos` bucket is private. `lib/db/database.types.ts` is generated from that project. Regenerate it with `pnpm gen:types` after the Supabase CLI is linked.
 
-```bash
-# Supabase CLI: https://supabase.com/docs/guides/local-development/cli/getting-started
-supabase login
-supabase projects list
+The Vercel project is `tv-dashboard`, framework Next.js, function region `fra1`, connected to this GitHub repo. No environment variables are set there. Do not deploy until the owner has filled the values below.
 
-# Vercel CLI
-pnpm add -g vercel
-vercel login
-vercel whoami
-```
-
-When those succeed, the next steps are: create the Supabase project in Frankfurt only if the organization still has a free project slot, link it, push `supabase/migrations`, generate types with `pnpm gen:types`, create the Vercel project connected to this GitHub repo with framework Next.js and region `fra1`, and set no secrets until the owner has filled them.
-
-The migration enables row level security on every table and adds no policies. `anon` and `authenticated` are revoked. The `photos` bucket is private, capped at 5 MB, and limited to image MIME types. `lib/db/database.types.ts` is an interim TypeScript mirror until `pnpm gen:types` can run.
+Wins-card evidence is enforced with a trigger. Postgres does not allow a subquery inside a check constraint.
 
 The cron migration that calls the production URL is added after the first deploy. The Pi agent is generated after that deploy, because this environment cannot reach the Pi.
 
