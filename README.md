@@ -2,7 +2,7 @@
 
 A self-hosted dashboard for a Chromecast. One Next.js app serves the TV page, and later the phone remote, the API and the MCP endpoint. Supabase holds the data. Vercel hosts the app.
 
-This repository is the M0 skeleton. The Today screen renders sample data. The other six views, rotation, the phone remote, MCP and the Pi watchdog are later milestones.
+The TV page renders seven screens from the sample seed: Today, Week, Month, Site, TikTok, Vision board and Home. `/api/state` chooses the screen. Rotation uses each view's weight and dwell, skips an empty view, and gives Today's weight to Week when today has no events. A content-free Realtime broadcast asks the TV to refetch; it also polls every 30 seconds. A failed refetch leaves the last screen up. The page reloads itself once, around 04:00 Europe/Bucharest. Quiet hours, interrupts and time-of-day profiles are not applied yet. Weather is still the sample line. Calendar feeds and TikTok or analytics keys are not wired.
 
 ## Defaults
 

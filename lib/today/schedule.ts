@@ -9,11 +9,28 @@ export type ScheduleEvent = {
   start: { hour: number; minute: number };
   end: { hour: number; minute: number };
   personId: PersonId | null;
+  allDay?: boolean;
 };
 
 // Wall-clock sample matching supabase/seed.sql. dayOffset 0 is the current
 // Bucharest day, so the TV page stays readable before the database is linked.
 export const sampleEvents: ScheduleEvent[] = [
+  {
+    id: "22222222-2222-4222-8222-222222222211",
+    title: "Cafea",
+    dayOffset: -2,
+    start: { hour: 12, minute: 0 },
+    end: { hour: 13, minute: 0 },
+    personId: "mara",
+  },
+  {
+    id: "22222222-2222-4222-8222-222222222210",
+    title: "Sport",
+    dayOffset: -1,
+    start: { hour: 18, minute: 0 },
+    end: { hour: 19, minute: 0 },
+    personId: "alex",
+  },
   {
     id: "22222222-2222-4222-8222-222222222201",
     title: "Mic dejun",
@@ -85,6 +102,14 @@ export const sampleEvents: ScheduleEvent[] = [
     start: { hour: 9, minute: 30 },
     end: { hour: 11, minute: 0 },
     personId: "alex",
+  },
+  {
+    id: "22222222-2222-4222-8222-222222222212",
+    title: "Aniversare",
+    dayOffset: 10,
+    start: { hour: 19, minute: 0 },
+    end: { hour: 22, minute: 0 },
+    personId: null,
   },
 ];
 

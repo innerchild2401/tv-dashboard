@@ -147,3 +147,196 @@ values (
   true,
   'idea-quiet-evening'
 );
+
+-- Extra sample rows for the week, month, vision board, site and TikTok screens.
+insert into public.events (id, title, starts_at, ends_at, all_day, person_id, source, locked, external_id)
+select
+  rows.id,
+  rows.title,
+  bounds.day_start + rows.start_offset,
+  bounds.day_start + rows.end_offset,
+  false,
+  rows.person_id,
+  'integration',
+  false,
+  rows.external_id
+from (
+  select (date_trunc('day', now() at time zone 'Europe/Bucharest') at time zone 'Europe/Bucharest') as day_start
+) as bounds
+cross join (
+  values
+    ('22222222-2222-4222-8222-222222222210'::uuid, 'Sport', interval '-1 days 18 hours', interval '-1 days 19 hours', 'alex', 'event-sport'),
+    ('22222222-2222-4222-8222-222222222211'::uuid, 'Cafea', interval '-2 days 12 hours', interval '-2 days 13 hours', 'mara', 'event-coffee'),
+    ('22222222-2222-4222-8222-222222222212'::uuid, 'Aniversare', interval '10 days 19 hours', interval '10 days 22 hours', null, 'event-anniversary')
+) as rows (id, title, start_offset, end_offset, person_id, external_id);
+
+insert into public.cards (
+  id, view_id, kind, title, body, color, tilt,
+  grid_col, grid_row, grid_col_span, grid_row_span,
+  pinned, source, locked, external_id, data
+)
+select
+  '66666666-6666-4666-8666-666666666603',
+  'vision',
+  'countdown',
+  'Vacanță',
+  null,
+  'sky',
+  1,
+  3, 0, 1, 2,
+  false,
+  'assistant',
+  false,
+  'card-countdown-sample',
+  jsonb_build_object('target', bounds.day_start + interval '21 days 9 hours', 'label', 'Vacanță')
+from (
+  select (date_trunc('day', now() at time zone 'Europe/Bucharest') at time zone 'Europe/Bucharest') as day_start
+) as bounds;
+
+insert into public.cards (
+  id, view_id, kind, title, body, color, tilt,
+  grid_col, grid_row, grid_col_span, grid_row_span,
+  pinned, source, locked, external_id, data
+)
+values
+  (
+    '66666666-6666-4666-8666-666666666604',
+    'vision',
+    'progress',
+    null,
+    null,
+    'mint',
+    -2,
+    2, 1, 1, 1,
+    false,
+    'assistant',
+    false,
+    'card-progress-sample',
+    '{"label":"Pachetul","value":0,"max":1,"style":"ring","evidence":"task:done:11111111-1111-4111-8111-111111111111"}'::jsonb
+  ),
+  (
+    '66666666-6666-4666-8666-666666666605',
+    'vision',
+    'wins',
+    null,
+    null,
+    'coral',
+    1,
+    0, 2, 2, 1,
+    false,
+    'assistant',
+    false,
+    'card-wins-sample',
+    '{"items":[{"text":"Întâlnirea s-a încheiat","evidence":"event:22222222-2222-4222-8222-222222222202"}]}'::jsonb
+  ),
+  (
+    '66666666-6666-4666-8666-666666666606',
+    'vision',
+    'recap',
+    null,
+    'O zi liniștită: întâlnirea de dimineață s-a terminat, iar seara rămâne cină.',
+    'pink',
+    -1,
+    2, 2, 2, 1,
+    false,
+    'assistant',
+    false,
+    'card-recap-sample',
+    '{"recapId":"55555555-5555-4555-8555-555555555501"}'::jsonb
+  );
+
+insert into public.metrics (key, value, previous, fetched_at, source, external_id)
+select
+  'site.day.' || to_char(day_local, 'YYYY-MM-DD'),
+  80 + mod((29 + offs) * 17, 50),
+  null,
+  now(),
+  'manual',
+  'metric-site-day-' || to_char(day_local, 'YYYY-MM-DD')
+from (
+  select
+    offs,
+    ((bounds.day_start + make_interval(days => offs)) at time zone 'Europe/Bucharest')::date as day_local
+  from (
+    select (date_trunc('day', now() at time zone 'Europe/Bucharest') at time zone 'Europe/Bucharest') as day_start
+  ) as bounds
+  cross join generate_series(-29, 0) as offs
+) as days;
+
+insert into public.metrics (key, value, previous, fetched_at, source, external_id)
+select
+  'tiktok.views.day.' || to_char(day_local, 'YYYY-MM-DD'),
+  4200 + mod((6 + offs) * 137, 1800),
+  null,
+  now(),
+  'manual',
+  'metric-tiktok-day-' || to_char(day_local, 'YYYY-MM-DD')
+from (
+  select
+    offs,
+    ((bounds.day_start + make_interval(days => offs)) at time zone 'Europe/Bucharest')::date as day_local
+  from (
+    select (date_trunc('day', now() at time zone 'Europe/Bucharest') at time zone 'Europe/Bucharest') as day_start
+  ) as bounds
+  cross join generate_series(-6, 0) as offs
+) as days;
+
+insert into public.metrics (key, value, previous, fetched_at, source, external_id)
+values
+  ('site.page.acasa', 420, null, now(), 'manual', 'metric-site-page-acasa'),
+  ('site.page.jurnal', 180, null, now(), 'manual', 'metric-site-page-jurnal'),
+  ('site.page.despre', 96, null, now(), 'manual', 'metric-site-page-despre'),
+  ('site.source.direct', 310, null, now(), 'manual', 'metric-site-source-direct'),
+  ('site.source.search', 250, null, now(), 'manual', 'metric-site-source-search'),
+  ('site.source.social', 136, null, now(), 'manual', 'metric-site-source-social'),
+  ('tiktok.followers', 12840, 12710, now(), 'manual', 'metric-tiktok-followers'),
+  ('tiktok.likes.7d', 3100, 2740, now(), 'manual', 'metric-tiktok-likes-7d'),
+  ('tiktok.video.views', 8200, null, now(), 'manual', 'metric-tiktok-video-views'),
+  ('tiktok.video.likes', 640, null, now(), 'manual', 'metric-tiktok-video-likes');
+
+insert into public.metrics (key, value, previous, fetched_at, source, external_id)
+select
+  'site.visitors.today',
+  today_value,
+  yesterday_value,
+  now(),
+  'manual',
+  'metric-site-visitors-today'
+from (
+  select
+    sum(value) filter (where key = 'site.day.' || to_char(day_start at time zone 'Europe/Bucharest', 'YYYY-MM-DD')) as today_value,
+    sum(value) filter (where key = 'site.day.' || to_char((day_start - interval '1 day') at time zone 'Europe/Bucharest', 'YYYY-MM-DD')) as yesterday_value
+  from public.metrics
+  cross join (
+    select (date_trunc('day', now() at time zone 'Europe/Bucharest') at time zone 'Europe/Bucharest') as day_start
+  ) as bounds
+  where key like 'site.day.%' and deleted_at is null
+) as totals;
+
+insert into public.metrics (key, value, previous, fetched_at, source, external_id)
+select 'site.visitors.7d', week_value, previous_week, now(), 'manual', 'metric-site-visitors-7d'
+from (
+  select
+    sum(value) filter (where day_local >= today_local - 6) as week_value,
+    sum(value) filter (where day_local < today_local - 6 and day_local >= today_local - 13) as previous_week
+  from (
+    select
+      value,
+      to_date(substring(key from 10), 'YYYY-MM-DD') as day_local,
+      (now() at time zone 'Europe/Bucharest')::date as today_local
+    from public.metrics
+    where key like 'site.day.%' and deleted_at is null
+  ) as days
+) as totals;
+
+insert into public.metrics (key, value, previous, fetched_at, source, external_id)
+select 'site.visitors.30d', month_value, round(month_value * 0.94), now(), 'manual', 'metric-site-visitors-30d'
+from (
+  select sum(value) as month_value from public.metrics where key like 'site.day.%' and deleted_at is null
+) as totals;
+
+insert into public.metrics (key, value, previous, fetched_at, source, external_id)
+select 'tiktok.views.7d', week_value, round(week_value * 0.88), now(), 'manual', 'metric-tiktok-views-7d'
+from (
+  select sum(value) as week_value from public.metrics where key like 'tiktok.views.day.%' and deleted_at is null
+) as totals;

@@ -1,8 +1,11 @@
 import { authorizeTv } from "@/lib/auth/tv";
-import { projectToday } from "@/lib/today/project";
-import { sampleSchedule } from "@/lib/today/schedule";
+import { buildTvState } from "@/lib/state/build";
+import { loadSnapshot } from "@/lib/state/load";
+import { parseViewId } from "@/lib/tv/session";
 
-export function GET(request: Request) {
+export const dynamic = "force-dynamic";
+
+export async function GET(request: Request) {
   const header = request.headers.get("authorization") ?? "";
   const token = header.startsWith("Bearer ") ? header.slice("Bearer ".length).trim() : "";
   const auth = authorizeTv(token);
@@ -10,11 +13,13 @@ export function GET(request: Request) {
     return Response.json({ ok: false, reason: auth.reason }, { status: auth.status });
   }
 
-  return Response.json({
-    ok: true,
-    currentView: "today",
-    until: null,
-    reason: "Ecranul de azi, date de exemplu",
-    view: projectToday(sampleSchedule, new Date()),
-  });
+  const now = new Date();
+  try {
+    const snapshot = await loadSnapshot(now);
+    const preview = process.env.NODE_ENV === "production" ? null : parseViewId(new URL(request.url).searchParams.get("view"));
+    const state = buildTvState(snapshot, now, preview);
+    return Response.json(state, { headers: { "Cache-Control": "no-store" } });
+  } catch {
+    return Response.json({ ok: false }, { status: 503 });
+  }
 }

@@ -1,7 +1,6 @@
 export const ro = {
   appTitle: "Tablou",
-  homeIntro:
-    "Ecranul televizorului este pregătit cu date de exemplu. Completează variabilele de mediu înainte de deploy.",
+  homeIntro: "Televizorul rotește șapte ecrane. Datele de exemplu rămân până când calendarele și metricile reale sunt legate.",
   openTv: "Deschide ecranul TV",
   viewsNav: "Ecrane",
   views: {
@@ -26,6 +25,40 @@ export const ro = {
   priority: "Prioritate",
   tokenInvalid: "Linkul televizorului nu este valid.",
   tokenUnconfigured: "Tabloul nu este configurat.",
+  allDay: "Toată ziua",
+  allDayShort: "Zi",
+  tasks: "Taskuri",
+  shopping: "Cumpărături",
+  noTasks: "Niciun task deschis",
+  emptyShopping: "Nimic de cumpărat",
+  otherCategory: "Altele",
+  visitors: "Vizitatori",
+  topPages: "Pagini",
+  sources: "Surse",
+  followers: "Urmăritori",
+  viewsLabel: "Vizualizări",
+  likes: "Aprecieri",
+  lastVideo: "Ultimul video",
+  days: "zile",
+  dayOne: "zi",
+  wordOfMonth: "Cuvântul lunii",
+  wins: "Reușite",
+  todayStat: "Azi",
+  sevenDays: "7 zile",
+  thirtyDays: "30 de zile",
+  chartSite: "Vizitatori, ultimele 30 de zile",
+  chartTiktok: "Vizualizări pe zile",
+  updated: "Actualizat acum",
+  rotationOnly: "Singurul ecran",
+  dueToday: "azi",
+  photo: "Fotografie",
+  weight: "pondere",
 } as const;
 
 export type ViewId = keyof typeof ro.views;
+
+export const VIEW_IDS: ViewId[] = ["today", "week", "month", "site", "tiktok", "vision", "home"];
+
+export function rotationReason(id: ViewId, weight: number): string {
+  return `${ro.views[id]} · ${ro.weight} ${weight}`;
+}
