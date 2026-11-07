@@ -53,6 +53,8 @@ export function sampleSnapshot(now: Date): Snapshot {
       location: sampleConfig.location.name,
       tempC: sampleSchedule.weather.tempC,
       label: sampleSchedule.weather.label,
+      fetchedAt: null,
     },
+    calendarFetchedAt: null,
   };
 }

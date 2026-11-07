@@ -4,6 +4,8 @@ import { viewCandidates } from "@/lib/state/availability";
 import { projectWeek, projectMonth } from "@/lib/views/calendar";
 import { projectHome, projectVision } from "@/lib/views/household";
 import { projectSite, projectTikTok } from "@/lib/views/metrics";
+import { CALENDAR_INTERVAL_MS, WEATHER_INTERVAL_MS } from "@/lib/adapters/intervals";
+import { updatedLabel } from "@/lib/format/display";
 import { formatClock, formatLongDate } from "@/lib/time/bucharest";
 import { projectTodayFromEvents } from "@/lib/today/project";
 import type { Snapshot, TodayModel, TvState } from "@/lib/state/types";
@@ -21,6 +23,7 @@ export function buildTvState(snapshot: Snapshot, now: Date, forceView?: ViewId |
   const until = forced ? new Date(now.getTime() + dwellSeconds * 1000).toISOString() : decision.until;
   const reason = pool.length === 0 ? ro.rotationOnly : rotationReason(current, weight);
   const priority = activePriority(snapshot, now);
+  const calendarNote = updatedLabel(snapshot.calendarFetchedAt, now, CALENDAR_INTERVAL_MS);
   const today = projectTodayFromEvents({
     now,
     events: snapshot.events,
@@ -57,6 +60,7 @@ export function buildTvState(snapshot: Snapshot, now: Date, forceView?: ViewId |
         location: snapshot.weather.location,
         tempC: snapshot.weather.tempC === null ? "" : String(snapshot.weather.tempC),
         label: snapshot.weather.label ?? "",
+        updatedLabel: updatedLabel(snapshot.weather.fetchedAt, now, WEATHER_INTERVAL_MS),
       },
       priority,
       pills: configured.map((view) => ({
@@ -66,9 +70,9 @@ export function buildTvState(snapshot: Snapshot, now: Date, forceView?: ViewId |
       })),
     },
     ...empty,
-    today: current === "today" ? todayBody(today) : null,
-    week: current === "week" ? projectWeek(snapshot, now) : null,
-    month: current === "month" ? projectMonth(snapshot, now) : null,
+    today: current === "today" ? { ...todayBody(today), updatedLabel: calendarNote } : null,
+    week: current === "week" ? { ...projectWeek(snapshot, now), updatedLabel: calendarNote } : null,
+    month: current === "month" ? { ...projectMonth(snapshot, now), updatedLabel: calendarNote } : null,
     site: current === "site" ? projectSite(snapshot, now) : null,
     tiktok: current === "tiktok" ? projectTikTok(snapshot, now) : null,
     vision: current === "vision" ? projectVision(snapshot, now) : null,
@@ -76,7 +80,7 @@ export function buildTvState(snapshot: Snapshot, now: Date, forceView?: ViewId |
   };
 }
 
-function todayBody(today: ReturnType<typeof projectTodayFromEvents>): TodayModel {
+function todayBody(today: ReturnType<typeof projectTodayFromEvents>): Omit<TodayModel, "updatedLabel"> {
   return {
     leadLabel: today.leadLabel,
     leadDateLabel: today.leadDateLabel,

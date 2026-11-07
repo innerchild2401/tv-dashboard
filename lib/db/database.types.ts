@@ -191,6 +191,33 @@ export type Database = {
         }
         Relationships: []
       }
+      integration_cache: {
+        Row: {
+          attempted_at: string | null
+          etag: string | null
+          fetched_at: string | null
+          key: string
+          ok: boolean
+          payload: Json
+        }
+        Insert: {
+          attempted_at?: string | null
+          etag?: string | null
+          fetched_at?: string | null
+          key: string
+          ok?: boolean
+          payload?: Json
+        }
+        Update: {
+          attempted_at?: string | null
+          etag?: string | null
+          fetched_at?: string | null
+          key?: string
+          ok?: boolean
+          payload?: Json
+        }
+        Relationships: []
+      }
       ideas: {
         Row: {
           created_at: string

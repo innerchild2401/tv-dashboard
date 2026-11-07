@@ -27,6 +27,7 @@ export function Chrome({
             <p className="weather-meta">
               <span>{chrome.weather.location}</span>
               {chrome.weather.label ? <span>{chrome.weather.label}</span> : null}
+              {chrome.weather.updatedLabel ? <span className="freshness">{chrome.weather.updatedLabel}</span> : null}
             </p>
           </div>
         ) : null}

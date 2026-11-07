@@ -10,6 +10,7 @@ export function TodayView({ view }: { view: TodayModel }) {
         <div className="agenda-head">
           <h2>{view.leadLabel}</h2>
           <p className="lead-date">{view.leadDateLabel}</p>
+          {view.updatedLabel ? <p className="freshness">{view.updatedLabel}</p> : null}
         </div>
         {view.agenda.length === 0 ? (
           <p className="empty">{view.emptyAgenda}</p>

@@ -1,6 +1,7 @@
 import { ro, type ViewId } from "@/i18n/ro";
 import { personChip, type PersonChip } from "@/lib/people";
 import { sampleSchedule } from "@/lib/today/schedule";
+import { compareEvents, eventOnDay } from "@/lib/views/overlap";
 import {
   addDays,
   dateKey,
@@ -40,7 +41,7 @@ export type TodayView = {
   dateLabel: string;
   leadLabel: string;
   leadDateLabel: string;
-  weather: { location: string; tempC: number | null; label: string | null };
+  weather: { location: string; tempC: number | null; label: string | null; fetchedAt?: string | null };
   priority: { text: string; reason: string } | null;
   agenda: AgendaItem[];
   showNowLine: boolean;
@@ -105,16 +106,15 @@ export function projectTodayFromEvents(input: {
   const today = { year: parts.year, month: parts.month, day: parts.day };
   const leadOffset = parts.hour >= input.eveningLeadHour ? 1 : 0;
   const leadDate = addDays(today, leadOffset);
-  const leadKey = dateKey(leadDate);
   const placed = input.events
     .map((event) => ({ event, start: new Date(event.start), end: new Date(event.end) }))
-    .filter(({ start }) => dateKey(zonedParts(start)) === leadKey)
-    .sort((left, right) => left.start.getTime() - right.start.getTime());
+    .filter(({ event }) => eventOnDay(event, leadDate))
+    .sort((left, right) => compareEvents(left.event, right.event));
 
   const agenda: AgendaItem[] = placed.map(({ event, start, end }) => {
     let state: AgendaItem["state"] = "upcoming";
     if (leadOffset === 0 && input.now >= end) state = "past";
-    else if (leadOffset === 0 && input.now >= start) state = "current";
+    else if (!event.allDay && leadOffset === 0 && input.now >= start) state = "current";
     return {
       id: event.id,
       timeLabel: event.allDay ? ro.allDayShort : formatClock(start),
@@ -124,7 +124,10 @@ export function projectTodayFromEvents(input: {
     };
   });
 
-  const cursor = agenda.find((item) => item.state !== "past") ?? null;
+  const cursor =
+    agenda.find((item, index) => item.state !== "past" && !placed[index]?.event.allDay) ??
+    agenda.find((item) => item.state !== "past") ??
+    null;
   const showNowLine = leadOffset === 0 && agenda.length > 0;
 
   return {
@@ -145,9 +148,7 @@ export function projectTodayFromEvents(input: {
       return {
         key,
         label: formatShortDate(zonedTimeToUtc({ ...day, hour: 12, minute: 0 })),
-        titles: input.events
-          .filter((event) => dateKey(zonedParts(new Date(event.start))) === key)
-          .map((event) => event.title),
+        titles: input.events.filter((event) => eventOnDay(event, day)).map((event) => event.title),
       };
     }),
     views: input.viewIds.map((id) => ({

@@ -3,7 +3,10 @@ import type { MonthModel } from "@/lib/state/types";
 export function MonthView({ view }: { view: MonthModel }) {
   return (
     <section className="month" aria-label={view.title}>
-      <h2>{view.title}</h2>
+      <div className="month-head">
+        <h2>{view.title}</h2>
+        {view.updatedLabel ? <p className="freshness">{view.updatedLabel}</p> : null}
+      </div>
       <div className="month-grid">
         {view.weekdays.map((label) => (
           <p key={label} className="month-weekday">

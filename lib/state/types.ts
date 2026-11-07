@@ -77,13 +77,14 @@ export type Snapshot = {
   recap: SnapshotRecap | null;
   priorities: SnapshotPriority[];
   metrics: SnapshotMetric[];
-  weather: { location: string; tempC: number | null; label: string | null };
+  weather: { location: string; tempC: number | null; label: string | null; fetchedAt: string | null };
+  calendarFetchedAt: string | null;
 };
 
 export type ChromeModel = {
   clock: string;
   dateLabel: string;
-  weather: { location: string; tempC: string; label: string };
+  weather: { location: string; tempC: string; label: string; updatedLabel: string | null };
   priority: { text: string; reason: string } | null;
   pills: { id: ViewId; label: string; active: boolean }[];
 };
@@ -91,7 +92,7 @@ export type ChromeModel = {
 export type TodayModel = Pick<
   TodayView,
   "leadLabel" | "leadDateLabel" | "agenda" | "showNowLine" | "nowBeforeId" | "nextEvent" | "nextDays" | "emptyAgenda"
->;
+> & { updatedLabel: string | null };
 
 export type WeekModel = {
   columns: {
@@ -101,6 +102,7 @@ export type WeekModel = {
     isToday: boolean;
     events: { id: string; timeLabel: string; title: string; person: PersonChip | null }[];
   }[];
+  updatedLabel: string | null;
 };
 
 export type MonthModel = {
@@ -114,6 +116,7 @@ export type MonthModel = {
     title: string | null;
     extra: number;
   }[];
+  updatedLabel: string | null;
 };
 
 export type StatModel = { label: string; value: string; delta: string | null };

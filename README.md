@@ -2,7 +2,11 @@
 
 A self-hosted dashboard for a Chromecast. One Next.js app serves the TV page, and later the phone remote, the API and the MCP endpoint. Supabase holds the data. Vercel hosts the app.
 
-The TV page renders seven screens from the sample seed: Today, Week, Month, Site, TikTok, Vision board and Home. `/api/state` chooses the screen. Rotation uses each view's weight and dwell, skips an empty view, and gives Today's weight to Week when today has no events. A content-free Realtime broadcast asks the TV to refetch; it also polls every 30 seconds. A failed refetch leaves the last screen up. The page reloads itself once, around 04:00 Europe/Bucharest. Quiet hours, interrupts and time-of-day profiles are not applied yet. Weather is still the sample line. Calendar feeds and TikTok or analytics keys are not wired.
+The TV page renders seven screens from the sample seed: Today, Week, Month, Site, TikTok, Vision board and Home. `/api/state` chooses the screen. Rotation uses each view's weight and dwell, skips an empty view, and gives Today's weight to Week when today has no events. A content-free Realtime broadcast asks the TV to refetch; it also polls every 30 seconds. A failed refetch leaves the last screen up. The page reloads itself once, around 04:00 Europe/Bucharest. Quiet hours, interrupts and time-of-day profiles are not applied yet. TikTok and analytics keys are not wired.
+
+Weather comes from Open-Meteo for the location in Config (default Constanța). It refreshes every 30 minutes. If a reading has never succeeded, the header hides the weather block. A later failure keeps the last reading.
+
+Calendar feeds are read from `ICAL_URL_ALEX` and `ICAL_URL_MARA`. When a variable is empty, that person's seed events stay on screen and the app does not crash. A set URL is fetched every 5 minutes with `If-None-Match`. A failed fetch keeps the last good events. Recurring events are expanded 45 days either side of today, including time zones and all-day dates. Week is a sliding window with today fixed in column 3. Month is a Monday-start grid.
 
 ## Defaults
 
@@ -44,11 +48,11 @@ Do not deploy, and do not run the seed against a hosted database, until those va
 
 Supabase project `xbqcywzbykstjlnrrycl` is in Central EU (Frankfurt). The migration is applied: row level security is enabled on every table, there are no policies, `anon` and `authenticated` have no grants, and the `photos` bucket is private. `lib/db/database.types.ts` is generated from that project. Regenerate it with `pnpm gen:types` after the Supabase CLI is linked.
 
-The Vercel project is `tv-dashboard`, framework Next.js, function region `fra1`, connected to this GitHub repo. No environment variables are set there. Do not deploy until the owner has filled the values below.
+The Vercel project is `tv-dashboard`, framework Next.js, function region `fra1`, connected to this GitHub repo. Production is [https://tv-dashboard-sigma-one.vercel.app](https://tv-dashboard-sigma-one.vercel.app).
 
 Wins-card evidence is enforced with a trigger. Postgres does not allow a subquery inside a check constraint.
 
-The cron migration that calls the production URL is added after the first deploy. The Pi agent is generated after that deploy, because this environment cannot reach the Pi.
+Calendar and weather refresh from `/api/cron/calendar` (every 5 minutes) and `/api/cron/weather` (every 30 minutes). Supabase `pg_cron` and `pg_net` call those routes. The routes skip a call that arrives before the interval, so they need no secret. A read that finds stale data refreshes it as well. The Pi agent is generated later, because this environment cannot reach the Pi.
 
 ## Daily routine contract
 

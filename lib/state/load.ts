@@ -1,15 +1,20 @@
+import { readCalendarFetchedAt, readWeather, refreshDueIntegrations } from "@/lib/adapters/run";
 import { createServiceClient } from "@/lib/db/server";
 import { cardSchema, configSchema } from "@/lib/schemas";
 import { sampleConfig } from "@/lib/seed/sample-config";
 import { sampleMetrics } from "@/lib/seed/sample-metrics";
 import { sampleSnapshot } from "@/lib/state/sample";
 import type { Snapshot, SnapshotCard, SnapshotMetric, SnapshotPriority } from "@/lib/state/types";
-import { sampleSchedule } from "@/lib/today/schedule";
 import { addDays, zonedParts, zonedTimeToUtc } from "@/lib/time/bucharest";
 
 export async function loadSnapshot(now = new Date()): Promise<Snapshot> {
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
     return sampleSnapshot(now);
+  }
+  try {
+    await refreshDueIntegrations(now);
+  } catch {
+    // The last stored events and weather stay on screen.
   }
   return loadDatabaseSnapshot(now);
 }
@@ -27,8 +32,8 @@ async function loadDatabaseSnapshot(now: Date): Promise<Snapshot> {
         .from("events")
         .select("id, title, starts_at, ends_at, all_day, person_id")
         .is("deleted_at", null)
-        .gte("starts_at", windowStart)
         .lte("starts_at", windowEnd)
+        .gte("ends_at", windowStart)
         .order("starts_at"),
       supabase.from("tasks").select("id, text, done, assignee_id, due_date").is("deleted_at", null),
       supabase.from("shopping_items").select("id, text, qty, unit, category, checked").is("deleted_at", null),
@@ -115,6 +120,13 @@ async function loadDatabaseSnapshot(now: Date): Promise<Snapshot> {
 
   const metrics = mergeSampleMetrics(eventsToMetrics(metricsResult.data ?? []), now);
   const recapRow = (recapsResult.data ?? []).find((row) => !row.expires_at || new Date(row.expires_at).getTime() > now.getTime());
+  const weather = await readWeather(supabase, config.location.name).catch(() => ({
+    location: config.location.name,
+    tempC: null,
+    label: null,
+    fetchedAt: null,
+  }));
+  const calendarFetchedAt = await readCalendarFetchedAt(supabase).catch(() => null);
 
   return {
     config,
@@ -163,11 +175,8 @@ async function loadDatabaseSnapshot(now: Date): Promise<Snapshot> {
       }),
     ),
     metrics,
-    weather: {
-      location: config.location.name,
-      tempC: sampleSchedule.weather.tempC,
-      label: sampleSchedule.weather.label,
-    },
+    weather,
+    calendarFetchedAt,
   };
 }
 
