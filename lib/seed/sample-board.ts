@@ -1,5 +1,5 @@
 import { addDays, zonedParts, zonedTimeToUtc } from "@/lib/time/bucharest";
-import type { SnapshotCard, SnapshotRecap, SnapshotShopping, SnapshotTask } from "@/lib/state/types";
+import type { SnapshotCard, SnapshotMessage, SnapshotRecap, SnapshotShopping, SnapshotTask } from "@/lib/state/types";
 
 export const sampleTasks: SnapshotTask[] = [
   {
@@ -35,6 +35,16 @@ export const sampleShopping: SnapshotShopping[] = [
     unit: "kg",
     category: "Fructe",
     checked: true,
+  },
+];
+
+export const sampleMessages: SnapshotMessage[] = [
+  {
+    id: "88888888-8888-4888-8888-888888888801",
+    text: "Bine ați venit acasă!",
+    author: "Alex",
+    color: "peach",
+    createdAt: "2026-11-08T10:00:00.000Z",
   },
 ];
 

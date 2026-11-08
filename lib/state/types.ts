@@ -33,6 +33,16 @@ export type SnapshotShopping = {
   checked: boolean;
 };
 
+export type HomeStickyColor = "butter" | "peach" | "mint" | "sky" | "rose" | "lemon";
+
+export type SnapshotMessage = {
+  id: string;
+  text: string;
+  author: string | null;
+  color: HomeStickyColor;
+  createdAt: string;
+};
+
 export type SnapshotCard = {
   id: string;
   kind: "photo" | "affirmation" | "countdown" | "word" | "progress" | "wins" | "recap" | "note";
@@ -87,6 +97,7 @@ export type Snapshot = {
   events: SnapshotEvent[];
   tasks: SnapshotTask[];
   shopping: SnapshotShopping[];
+  messages: SnapshotMessage[];
   cards: SnapshotCard[];
   spotlights: SnapshotSpotlight[];
   recap: SnapshotRecap | null;
@@ -191,10 +202,27 @@ export type VisionCardModel = {
 
 export type VisionModel = { cards: VisionCardModel[]; celebration: string | null };
 
+export type HomeStickyKind = "task" | "shopping" | "message";
+
+export type HomeSticky = {
+  id: string;
+  kind: HomeStickyKind;
+  kindLabel: string;
+  color: HomeStickyColor;
+  tilt: number;
+  text: string;
+  done: boolean;
+  meta: string | null;
+  person: PersonChip | null;
+};
+
+export type HomeDensity = "roomy" | "cozy" | "packed";
+
 export type HomeModel = {
-  tasks: { id: string; text: string; done: boolean; due: string | null; person: PersonChip | null }[];
-  groups: { category: string; items: { id: string; text: string; qty: string | null; checked: boolean }[] }[];
+  stickies: HomeSticky[];
+  density: HomeDensity;
   inboxWaiting: number;
+  emptyLabel: string | null;
 };
 
 export type TvState = {

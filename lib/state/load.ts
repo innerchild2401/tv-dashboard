@@ -34,6 +34,7 @@ async function loadDatabaseSnapshot(now: Date): Promise<Snapshot> {
     eventsResult,
     tasksResult,
     shoppingResult,
+    messagesResult,
     cardsResult,
     spotlightsResult,
     recapsResult,
@@ -51,6 +52,11 @@ async function loadDatabaseSnapshot(now: Date): Promise<Snapshot> {
       .order("starts_at"),
     supabase.from("tasks").select("id, text, done, assignee_id, due_date").is("deleted_at", null),
     supabase.from("shopping_items").select("id, text, qty, unit, category, checked").is("deleted_at", null),
+    supabase
+      .from("messages")
+      .select("id, text, author, color, created_at")
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false }),
     supabase
       .from("cards")
       .select("id, view_id, kind, title, body, color, tilt, grid_col, grid_row, grid_col_span, grid_row_span, expires_at, pinned, source, locked, external_id, data")
@@ -82,6 +88,7 @@ async function loadDatabaseSnapshot(now: Date): Promise<Snapshot> {
     eventsResult.error ||
     tasksResult.error ||
     shoppingResult.error ||
+    messagesResult.error ||
     cardsResult.error ||
     spotlightsResult.error ||
     recapsResult.error ||
@@ -183,6 +190,13 @@ async function loadDatabaseSnapshot(now: Date): Promise<Snapshot> {
       unit: row.unit,
       category: row.category,
       checked: row.checked,
+    })),
+    messages: (messagesResult.data ?? []).map((row) => ({
+      id: row.id,
+      text: row.text,
+      author: row.author,
+      color: row.color,
+      createdAt: row.created_at,
     })),
     cards,
     spotlights: (spotlightsResult.data ?? []).map((row) => ({

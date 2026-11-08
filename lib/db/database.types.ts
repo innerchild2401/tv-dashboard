@@ -455,6 +455,45 @@ export type Database = {
         }
         Relationships: []
       }
+      messages: {
+        Row: {
+          author: string | null
+          color: Database["public"]["Enums"]["message_color"]
+          created_at: string
+          deleted_at: string | null
+          external_id: string | null
+          id: string
+          locked: boolean
+          source: Database["public"]["Enums"]["source_kind"]
+          text: string
+          updated_at: string
+        }
+        Insert: {
+          author?: string | null
+          color?: Database["public"]["Enums"]["message_color"]
+          created_at?: string
+          deleted_at?: string | null
+          external_id?: string | null
+          id?: string
+          locked?: boolean
+          source: Database["public"]["Enums"]["source_kind"]
+          text: string
+          updated_at?: string
+        }
+        Update: {
+          author?: string | null
+          color?: Database["public"]["Enums"]["message_color"]
+          created_at?: string
+          deleted_at?: string | null
+          external_id?: string | null
+          id?: string
+          locked?: boolean
+          source?: Database["public"]["Enums"]["source_kind"]
+          text?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       priorities: {
         Row: {
           created_at: string
@@ -697,6 +736,7 @@ export type Database = {
         | "recap"
         | "note"
       inbox_status: "new" | "routed" | "needs_review"
+      message_color: "butter" | "peach" | "mint" | "sky" | "rose" | "lemon"
       source_kind: "manual" | "assistant" | "integration"
       spotlight_kind: "trip" | "competition" | "deadline" | "other"
     }
@@ -837,6 +877,7 @@ export const Constants = {
         "note",
       ],
       inbox_status: ["new", "routed", "needs_review"],
+      message_color: ["butter", "peach", "mint", "sky", "rose", "lemon"],
       source_kind: ["manual", "assistant", "integration"],
       spotlight_kind: ["trip", "competition", "deadline", "other"],
     },

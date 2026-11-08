@@ -13,6 +13,8 @@ import {
   type AgentStore,
   type CardKind,
   type CardRecord,
+  type MessageColor,
+  type MessageRecord,
   type Palette,
   type PersonRow,
   type PriorityRecord,
@@ -149,6 +151,16 @@ const checkInput = z.object({
   ids: z.array(z.string().uuid()).min(1).max(50),
   checked: z.boolean(),
 });
+const shoppingDeleteInput = z.object({
+  ids: z.array(z.string().uuid()).min(1).max(50).optional(),
+  externalIds: z.array(z.string().trim().min(1).max(200)).min(1).max(50).optional(),
+});
+const messageInput = z.object({
+  externalId: z.string().trim().min(1).max(200),
+  text: z.string().trim().min(1).max(280),
+  author: z.string().trim().min(1).max(80).nullable().optional(),
+  color: z.enum(["butter", "peach", "mint", "sky", "rose", "lemon"]).optional(),
+});
 const metricInput = z.object({
   key: z.string().trim().min(1).max(120).regex(/^[a-z0-9][a-z0-9._-]*$/i, "metric key must be letters, numbers, dots or dashes"),
   value: z.number().finite(),
@@ -183,7 +195,7 @@ export const TOOL_CATALOG: { name: ToolName; title: string; description: string;
     name: "get_schema",
     title: "Schemas for Grokbot",
     description:
-      "Return card schemas, palette tokens, and the Momente spotlight contract: kinds trip|competition|deadline|other, startsAt ISO instant (countdown = whole Europe/Bucharest calendar days until that date; 0 = azi), Romanian titles ok, tools upsert_spotlight and delete_spotlight with examples.",
+      "Return contracts for Vision cards, Momente spotlights, and Acasă (home) post-its: upsert_task/delete_task, shopping_add/shopping_check/shopping_delete, upsert_message/delete_message. Romanian text ok. Same externalId updates.",
     input: emptyInput,
   },
   { name: "upsert_card", title: "Upsert card", description: "Create or update a card on Victorii (viewId vision). The same externalId updates the existing card. A manual or locked card is refused. A win or progress card needs evidence. For a photo, pass kind=photo and image_url (HTTPS); the server stores it in the private photos bucket.", input: cardInput },
@@ -207,9 +219,51 @@ export const TOOL_CATALOG: { name: ToolName; title: string; description: string;
   { name: "get_inbox", title: "Inbox", description: "List inbox items that are not routed yet. Pass status to filter.", input: inboxInput },
   { name: "route_inbox_item", title: "Route inbox", description: "Route an inbox item to a task, shopping item, event, idea or note. Leave it as needs review when the destination is unclear. Create an event only when the text has a date and a time.", input: routeInput },
   { name: "upsert_events", title: "Upsert events", description: "Create or update assistant-owned events. The same externalId updates the existing event.", input: eventsInput },
-  { name: "upsert_task", title: "Upsert task", description: "Create or update a task. The same externalId updates the existing task.", input: taskInput },
-  { name: "shopping_add", title: "Add shopping", description: "Add shopping items, merging duplicates by name. A second run does not create another row or add the quantity again.", input: shoppingInput },
-  { name: "shopping_check", title: "Check shopping", description: "Check or uncheck shopping items the assistant owns.", input: checkInput },
+  {
+    name: "upsert_task",
+    title: "Upsert task",
+    description:
+      "Create or update a task on Acasă. Params: externalId (stable), text, done?, assignee? (person id or name), dueDate? (YYYY-MM-DD). Same externalId updates. Example: {\"externalId\":\"task-easybox\",\"text\":\"Ridică pachetul\",\"assignee\":\"Alex\",\"dueDate\":\"2026-11-09\"}.",
+    input: taskInput,
+  },
+  {
+    name: "delete_task",
+    title: "Delete task",
+    description: "Soft-delete an assistant-owned task. Pass id (uuid) or externalId. Locked/manual rows are refused.",
+    input: deleteInput,
+  },
+  {
+    name: "shopping_add",
+    title: "Add shopping",
+    description:
+      "Add grocery items on Acasă, merging duplicates by name or externalId. A second run does not create another row or add qty again. Example: {\"items\":[{\"text\":\"Lapte\",\"qty\":2,\"unit\":\"l\",\"category\":\"Lactate\"}]}.",
+    input: shoppingInput,
+  },
+  {
+    name: "shopping_check",
+    title: "Check shopping",
+    description: "Check or uncheck grocery items the assistant owns. Pass ids (uuids from get_dashboard_state) and checked true|false.",
+    input: checkInput,
+  },
+  {
+    name: "shopping_delete",
+    title: "Delete shopping",
+    description: "Soft-delete assistant-owned grocery items. Pass ids and/or externalIds. Locked/manual rows are skipped with a warning.",
+    input: shoppingDeleteInput,
+  },
+  {
+    name: "upsert_message",
+    title: "Upsert message",
+    description:
+      "Create or update a family message post-it on Acasă. Params: externalId, text (≤280), author? (e.g. Mama), color? butter|peach|mint|sky|rose|lemon. Example: {\"externalId\":\"msg-cină\",\"text\":\"Cina e la 19\",\"author\":\"Alex\",\"color\":\"peach\"}.",
+    input: messageInput,
+  },
+  {
+    name: "delete_message",
+    title: "Delete message",
+    description: "Soft-delete an assistant-owned Acasă message. Pass id or externalId.",
+    input: deleteInput,
+  },
   { name: "set_metric", title: "Set metric", description: "Set a metric the integrations cannot fetch. A manual metric is left unchanged.", input: metricInput },
   {
     name: "pin_view",
@@ -284,15 +338,19 @@ async function dispatch(store: AgentStore, name: ToolName, args: unknown, now: D
   if (name === "route_inbox_item") return routeInbox(store, args, now);
   if (name === "upsert_events") return upsertEvents(store, args);
   if (name === "upsert_task") return upsertTask(store, args);
+  if (name === "delete_task") return deleteTask(store, args, now);
   if (name === "shopping_add") return addShopping(store, args);
   if (name === "shopping_check") return checkShopping(store, args);
+  if (name === "shopping_delete") return deleteShopping(store, args, now);
+  if (name === "upsert_message") return upsertMessage(store, args, now);
+  if (name === "delete_message") return deleteMessage(store, args, now);
   if (name === "set_metric") return setMetric(store, args, now);
   if (name === "pin_view") return pinView(store, args, now);
   return undo(store, args, now);
 }
 
 async function stateOf(store: AgentStore, now: Date): Promise<Outcome> {
-  const [views, people, cards, events, tasks, shopping, recaps, priorities, inbox, metrics, spotlights] = await Promise.all([
+  const [views, people, cards, events, tasks, shopping, recaps, priorities, inbox, metrics, spotlights, messages] = await Promise.all([
     store.views(),
     store.people(),
     store.cards(),
@@ -304,6 +362,7 @@ async function stateOf(store: AgentStore, now: Date): Promise<Outcome> {
     store.inbox(),
     store.metrics(),
     store.spotlights(),
+    store.messages(),
   ]);
   const parts = zonedParts(now);
   const start = zonedTimeToUtc({ ...parts, hour: 0, minute: 0 }).getTime();
@@ -319,6 +378,7 @@ async function stateOf(store: AgentStore, now: Date): Promise<Outcome> {
         spotlights: active(spotlights).map(publicSpotlight),
         tasks: active(tasks).map(publicTask),
         shopping: active(shopping).map(publicShopping),
+        messages: active(messages).map(publicMessage),
         eventsToday: active(events).filter((event) => new Date(event.endsAt).getTime() > start && new Date(event.startsAt).getTime() < end),
         recap: liveRecap(recaps, now),
         priority: livePriority(priorities, now),
@@ -419,6 +479,71 @@ function schemaOf(): Outcome {
             "Omitting image_url keeps the existing photo when the card already has one.",
           ],
         },
+        home: {
+          viewId: "home",
+          labelRo: "Acasă",
+          description:
+            "TV post-it board mixing open tasks, grocery items, and family messages. Romanian text ok. Empty Acasă (no open tasks, no shopping, no messages) is skipped in rotation.",
+          stickyColors: ["butter", "peach", "mint", "sky", "rose", "lemon"],
+          tools: {
+            upsert_task: {
+              params: {
+                externalId: "string, required, stable idempotency key",
+                text: "string, required, ≤500",
+                done: "optional boolean — mark complete",
+                assignee: "optional person id or name, or null",
+                dueDate: "optional YYYY-MM-DD or null",
+              },
+              example: {
+                externalId: "task-easybox",
+                text: "Ridică pachetul de la easybox",
+                assignee: "Alex",
+                dueDate: "2026-11-09",
+                done: false,
+              },
+            },
+            delete_task: {
+              params: { id: "uuid optional", externalId: "string optional — pass one of them" },
+              example: { externalId: "task-easybox" },
+            },
+            shopping_add: {
+              params: {
+                items:
+                  "array 1–40 of { text, qty?, unit?, category?, externalId? }. Duplicates merge by externalId or normalized name; qty is not re-added.",
+              },
+              example: {
+                items: [{ text: "Lapte", qty: 2, unit: "l", category: "Lactate", externalId: "shop-lapte" }],
+              },
+            },
+            shopping_check: {
+              params: { ids: "uuid[] from get_dashboard_state.shopping", checked: "boolean" },
+              example: { ids: ["44444444-4444-4444-8444-444444444401"], checked: true },
+            },
+            shopping_delete: {
+              params: { ids: "optional uuid[]", externalIds: "optional string[] — pass at least one list" },
+              example: { externalIds: ["shop-lapte"] },
+            },
+            upsert_message: {
+              params: {
+                externalId: "string, required",
+                text: "string, required, ≤280",
+                author: "optional string or null (e.g. Mama)",
+                color: "optional butter | peach | mint | sky | rose | lemon",
+              },
+              example: {
+                externalId: "msg-cina",
+                text: "Cina e la 19:00",
+                author: "Alex",
+                color: "peach",
+              },
+            },
+            delete_message: {
+              params: { id: "uuid optional", externalId: "string optional — pass one of them" },
+              example: { externalId: "msg-cina" },
+            },
+          },
+          clearSamples: "Seeded sample message external id: msg-welcome. Call delete_message to clear it.",
+        },
         rules: [
           "A win or progress item needs evidence such as task:done:<id> or event:<id>.",
           "The same externalId updates the existing row, so a daily routine can run twice.",
@@ -426,6 +551,7 @@ function schemaOf(): Outcome {
           "A priority needs a reason and expires at the end of the day unless another time is given.",
           "Momente spotlights use upsert_spotlight / delete_spotlight. Day countdown is Bucharest calendar days, not hours.",
           "Victorii photo cards: kind=photo + image_url (HTTPS). Server stores into the private photos bucket.",
+          "Acasă post-its: tasks via upsert_task/delete_task, groceries via shopping_add/shopping_check/shopping_delete, messages via upsert_message/delete_message.",
         ],
       },
     }),
@@ -787,6 +913,20 @@ async function upsertTask(store: AgentStore, args: unknown): Promise<Outcome> {
   return done(success(saved.id, saved.warnings), saved.undo);
 }
 
+async function deleteTask(store: AgentStore, args: unknown, now: Date): Promise<Outcome> {
+  const input = read(deleteInput, args);
+  if (!input.ok) return input.outcome;
+  if (!input.value.id && !input.value.externalId) return no("id or externalId is required");
+  const rows = await store.tasks();
+  const existing = rows.find((row) => row.id === input.value.id || row.externalId === input.value.externalId) ?? null;
+  if (!existing) return no("that task was not found");
+  if (existing.deletedAt) return done(success(existing.id, ["already removed"]), null);
+  const locked = handLock(existing, "task");
+  if (locked) return no(locked);
+  await store.putTask({ ...existing, deletedAt: now.toISOString() });
+  return done(success(existing.id), { tasks: [copy(existing)] });
+}
+
 async function addShopping(store: AgentStore, args: unknown): Promise<Outcome> {
   const input = read(shoppingInput, args);
   if (!input.ok) return input.outcome;
@@ -840,6 +980,70 @@ async function checkShopping(store: AgentStore, args: unknown): Promise<Outcome>
   }
   if (!first) return no(warnings[0] ?? "nothing was changed");
   return done(success(first, warnings), previous.length ? { shopping: previous } : null);
+}
+
+async function deleteShopping(store: AgentStore, args: unknown, now: Date): Promise<Outcome> {
+  const input = read(shoppingDeleteInput, args);
+  if (!input.ok) return input.outcome;
+  const ids = input.value.ids ?? [];
+  const externalIds = input.value.externalIds ?? [];
+  if (ids.length === 0 && externalIds.length === 0) return no("ids or externalIds is required");
+  const rows = await store.shopping();
+  const warnings: string[] = [];
+  const previous: ShoppingRecord[] = [];
+  let first: string | null = null;
+  const wanted = new Set([...ids, ...externalIds]);
+  for (const existing of rows) {
+    if (existing.deletedAt) continue;
+    if (!wanted.has(existing.id) && !(existing.externalId && wanted.has(existing.externalId))) continue;
+    const locked = handLock(existing, "shopping item");
+    if (locked) {
+      warnings.push(locked);
+      continue;
+    }
+    previous.push(copy(existing));
+    await store.putShopping({ ...existing, deletedAt: now.toISOString() });
+    first ??= existing.id;
+  }
+  if (!first) return no(warnings[0] ?? "nothing was changed");
+  return done(success(first, warnings), { shopping: previous });
+}
+
+async function upsertMessage(store: AgentStore, args: unknown, now: Date): Promise<Outcome> {
+  const input = read(messageInput, args);
+  if (!input.ok) return input.outcome;
+  const rows = await store.messages();
+  const existing = rows.find((row) => row.externalId === input.value.externalId) ?? null;
+  const locked = handLock(existing, "message");
+  if (locked) return no(locked);
+  const color = (input.value.color ?? existing?.color ?? pickMessageColor(input.value.externalId)) as MessageColor;
+  const row: MessageRecord = {
+    id: existing?.id ?? crypto.randomUUID(),
+    text: input.value.text,
+    author: input.value.author === undefined ? (existing?.author ?? null) : input.value.author,
+    color,
+    source: "assistant",
+    locked: false,
+    externalId: input.value.externalId,
+    deletedAt: null,
+    createdAt: existing?.createdAt ?? now.toISOString(),
+  };
+  await store.putMessage(row);
+  return done(success(row.id), existing ? { messages: [copy(existing)] } : { drop: { messages: [row.id] } });
+}
+
+async function deleteMessage(store: AgentStore, args: unknown, now: Date): Promise<Outcome> {
+  const input = read(deleteInput, args);
+  if (!input.ok) return input.outcome;
+  if (!input.value.id && !input.value.externalId) return no("id or externalId is required");
+  const rows = await store.messages();
+  const existing = rows.find((row) => row.id === input.value.id || row.externalId === input.value.externalId) ?? null;
+  if (!existing) return no("that message was not found");
+  if (existing.deletedAt) return done(success(existing.id, ["already removed"]), null);
+  const locked = handLock(existing, "message");
+  if (locked) return no(locked);
+  await store.putMessage({ ...existing, deletedAt: now.toISOString() });
+  return done(success(existing.id), { messages: [copy(existing)] });
 }
 
 async function setMetric(store: AgentStore, args: unknown, now: Date): Promise<Outcome> {
@@ -1075,6 +1279,7 @@ async function handKeeps(store: AgentStore, body: UndoBody): Promise<string | nu
     [store.ideas(), idsOf(body.ideas, body.drop?.ideas)],
     [store.metrics(), idsOf(body.metrics, body.drop?.metrics)],
     [store.spotlights(), idsOf(body.spotlights, body.drop?.spotlights)],
+    [store.messages(), idsOf(body.messages, body.drop?.messages)],
   ];
   for (const [loaded, ids] of checks) {
     if (ids.length === 0) continue;
@@ -1238,6 +1443,26 @@ function publicShopping(item: ShoppingRecord) {
   };
 }
 
+function publicMessage(row: MessageRecord) {
+  return {
+    id: row.id,
+    externalId: row.externalId,
+    text: row.text,
+    author: row.author,
+    color: row.color,
+    source: row.source,
+    locked: row.locked,
+    createdAt: row.createdAt,
+  };
+}
+
+function pickMessageColor(seed: string): MessageColor {
+  const colors: MessageColor[] = ["butter", "peach", "mint", "sky", "rose", "lemon"];
+  let hash = 0;
+  for (let index = 0; index < seed.length; index += 1) hash = (hash * 31 + seed.charCodeAt(index)) | 0;
+  return colors[Math.abs(hash) % colors.length] ?? "butter";
+}
+
 function toSchemaCard(card: CardRecord) {
   return {
     id: card.id,
@@ -1272,6 +1497,8 @@ function mergeUndo(left: UndoBody, right: UndoBody): UndoBody {
     inbox: [...(left.inbox ?? []), ...(right.inbox ?? [])],
     ideas: [...(left.ideas ?? []), ...(right.ideas ?? [])],
     metrics: [...(left.metrics ?? []), ...(right.metrics ?? [])],
+    spotlights: [...(left.spotlights ?? []), ...(right.spotlights ?? [])],
+    messages: [...(left.messages ?? []), ...(right.messages ?? [])],
     drop: Object.values(drop).some((ids) => ids && ids.length > 0) ? drop : undefined,
     control: right.control ?? left.control,
     expectControl: right.expectControl ?? left.expectControl,
@@ -1323,7 +1550,22 @@ function no(reason: string): Outcome {
 }
 
 function done(result: ToolResult, undo: UndoBody | null): Outcome {
-  if (undo && !undo.cards?.length && !undo.events?.length && !undo.tasks?.length && !undo.shopping?.length && !undo.recaps?.length && !undo.priorities?.length && !undo.inbox?.length && !undo.ideas?.length && !undo.metrics?.length && !undo.drop && !undo.control) {
+  if (
+    undo &&
+    !undo.cards?.length &&
+    !undo.events?.length &&
+    !undo.tasks?.length &&
+    !undo.shopping?.length &&
+    !undo.recaps?.length &&
+    !undo.priorities?.length &&
+    !undo.inbox?.length &&
+    !undo.ideas?.length &&
+    !undo.metrics?.length &&
+    !undo.spotlights?.length &&
+    !undo.messages?.length &&
+    !undo.drop &&
+    !undo.control
+  ) {
     return { result, undo: null };
   }
   return { result, undo };

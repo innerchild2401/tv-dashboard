@@ -1,5 +1,5 @@
 import { sampleConfig } from "@/lib/seed/sample-config";
-import { sampleCards, sampleRecap, sampleShopping, sampleTasks } from "@/lib/seed/sample-board";
+import { sampleCards, sampleMessages, sampleRecap, sampleShopping, sampleTasks } from "@/lib/seed/sample-board";
 import { sampleMetrics } from "@/lib/seed/sample-metrics";
 import { sampleSpotlights } from "@/lib/seed/sample-spotlights";
 import { sampleSchedule } from "@/lib/today/schedule";
@@ -28,6 +28,7 @@ export function sampleSnapshot(now: Date): Snapshot {
       dueDate: `${today.year}-${String(today.month).padStart(2, "0")}-${String(today.day).padStart(2, "0")}`,
     })),
     shopping: sampleShopping,
+    messages: sampleMessages,
     cards: sampleCards(now),
     spotlights: sampleSpotlights(now),
     recap: {

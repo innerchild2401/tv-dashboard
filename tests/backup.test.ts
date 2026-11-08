@@ -10,6 +10,7 @@ const TABLES = [
   "spotlights",
   "events",
   "shopping_items",
+  "messages",
   "recaps",
   "inbox_items",
   "ideas",
