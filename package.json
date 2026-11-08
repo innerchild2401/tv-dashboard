@@ -12,6 +12,8 @@
     "lint": "eslint",
     "test": "tsx --test tests/**/*.test.ts",
     "gen:secrets": "node scripts/gen-secrets.mjs",
+    "backup": "tsx scripts/backup.ts",
+    "restore": "tsx scripts/restore.ts",
     "gen:types": "supabase gen types typescript --linked --schema public > lib/db/database.types.ts"
   },
   "dependencies": {

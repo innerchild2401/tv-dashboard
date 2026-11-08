@@ -19,12 +19,13 @@ export async function handleAgentHttp(request: Request, tool: string): Promise<R
     return json({ ok: false, id: null, warnings: [], reason: "the body must be a JSON object" }, 400);
   }
   const result = await executeTool(tool, body);
-  return json(result, statusFor(result.reason));
+  const status = agentStatus(result.reason);
+  return json(result, status.status, status.headers);
 }
 
-function statusFor(reason: string | undefined): number {
-  if (reason === "unknown tool") return 404;
-  if (reason === "too many requests, try again in a minute") return 429;
-  if (reason === "the dashboard database is not configured" || reason === "the dashboard could not check the rate limit") return 503;
-  return 200;
+export function agentStatus(reason: string | undefined): { status: number; headers?: Record<string, string> } {
+  if (reason === "unknown tool") return { status: 404 };
+  if (reason === "too many requests, try again in a minute") return { status: 429, headers: { "Retry-After": "60" } };
+  if (reason === "the dashboard database is not configured" || reason === "the dashboard could not check the rate limit") return { status: 503 };
+  return { status: 200 };
 }

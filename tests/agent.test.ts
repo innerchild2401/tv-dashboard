@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 import { authorizeAgent } from "../lib/agent/auth";
-import { handleAgentHttp } from "../lib/agent/http";
+import { agentStatus, handleAgentHttp } from "../lib/agent/http";
 import { handleMcp } from "../lib/agent/mcp";
 import { MemoryStore } from "../lib/agent/memory";
 import { active } from "../lib/agent/model";
@@ -134,6 +134,7 @@ describe("assistant edits", () => {
     const blocked = await executeTool("get_schema", {}, { store, now });
     assert.equal(blocked.ok, false);
     assert.match(blocked.reason ?? "", /too many requests/);
+    assert.deepEqual(agentStatus(blocked.reason), { status: 429, headers: { "Retry-After": "60" } });
 
     const fresh = new MemoryStore();
     await fresh.putPriority({

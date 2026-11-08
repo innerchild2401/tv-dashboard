@@ -36,6 +36,9 @@ yarn-error.log*
 .env*
 !.env.example
 
+# household backup from `pnpm backup`
+/backups
+
 # vercel
 .vercel
 
