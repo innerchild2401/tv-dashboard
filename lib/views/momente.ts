@@ -1,6 +1,6 @@
 import { ro } from "@/i18n/ro";
 import type { MomenteItem, MomenteLayout, MomenteModel, Snapshot, SnapshotSpotlight } from "@/lib/state/types";
-import { dateKey, zonedParts } from "@/lib/time/bucharest";
+import { dateKey, formatMomenteDue, zonedParts } from "@/lib/time/bucharest";
 
 export const MOMENTE_MAX_VISIBLE = 6;
 
@@ -85,6 +85,7 @@ function toItem(row: SnapshotSpotlight, now: Date): MomenteItem | null {
     days,
     daysLabel: today ? ro.dueToday : String(days),
     unitLabel: today ? null : days === 1 ? ro.dayOne : ro.days,
+    dueLabel: formatMomenteDue(row.startsAt),
     today,
   };
 }

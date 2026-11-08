@@ -11,7 +11,7 @@ import {
   projectMomente,
   selectMomenteItems,
 } from "../lib/views/momente";
-import { zonedTimeToUtc } from "../lib/time/bucharest";
+import { formatMomenteDue, zonedTimeToUtc } from "../lib/time/bucharest";
 import type { SnapshotSpotlight } from "../lib/state/types";
 
 const noon = zonedTimeToUtc({ year: 2026, month: 11, day: 8, hour: 12, minute: 0 });
@@ -26,6 +26,12 @@ describe("momente day countdown", () => {
     assert.equal(bucharestDaysUntil(nextDay, noon), 1);
     assert.equal(bucharestDaysUntil(inThree, noon), 3);
     assert.equal(bucharestDaysUntil(yesterday, noon), -1);
+  });
+
+  it("formats due labels as Romanian Bucharest day · time", () => {
+    const due = zonedTimeToUtc({ year: 2026, month: 11, day: 13, hour: 18, minute: 0 });
+    assert.equal(formatMomenteDue(due), "13 nov · 18:00");
+    assert.equal(formatMomenteDue(due.toISOString()), "13 nov · 18:00");
   });
 
   it("hides past items and labels today as azi", () => {
@@ -59,9 +65,11 @@ describe("momente day countdown", () => {
     assert.equal(selected.items.length, 2);
     assert.equal(selected.items[0]?.id, "soon");
     assert.equal(selected.items[0]?.pinned, true);
+    assert.equal(selected.items[0]?.dueLabel, "10 nov · 08:00");
     assert.equal(selected.items[1]?.today, true);
     assert.equal(selected.items[1]?.daysLabel, "azi");
     assert.equal(selected.items[1]?.unitLabel, null);
+    assert.equal(selected.items[1]?.dueLabel, "8 nov · 18:00");
   });
 });
 
