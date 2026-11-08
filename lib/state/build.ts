@@ -1,8 +1,8 @@
 import { ro, type ViewId } from "@/i18n/ro";
 import { activeHold, ROTATE_CONTROL, type DisplayControl } from "@/lib/remote/hold";
 import { accentColor } from "@/lib/theme/accent";
-import { peekNextView, prepareCandidates } from "@/lib/rotation/engine";
-import { activePriority, evaluateRules } from "@/lib/rotation/rules";
+import { peekNextView } from "@/lib/rotation/engine";
+import { activePriority, evaluateRules, rotationPool } from "@/lib/rotation/rules";
 import { viewCandidates } from "@/lib/state/availability";
 import { projectWeek, projectMonth } from "@/lib/views/calendar";
 import { projectHome, projectVision } from "@/lib/views/household";
@@ -124,19 +124,15 @@ export function buildTvState(
 function resolveNextView(snapshot: Snapshot, current: ViewId, untilIso: string): ViewId {
   const atUntil = new Date(untilIso);
   if (!Number.isFinite(atUntil.getTime())) return current;
+  // Successor of `current`, not "whatever wall clock says at until".
+  // Cast `?view=` forces a screen; re-resolving the day schedule at a synthetic
+  // dwell end ignores that previous view and can lock Lună↔Victorii (or any 2-cycle).
   const configured = viewCandidates(snapshot, atUntil);
-  const later = evaluateRules({
+  const pool = rotationPool({
     now: atUntil,
     config: snapshot.config,
-    events: snapshot.events,
-    priorities: snapshot.priorities,
-    metrics: snapshot.metrics,
-    forecast: snapshot.weather.hours ?? [],
     candidates: configured,
   });
-  if (later.viewId !== current) return later.viewId;
-  const prepared = prepareCandidates(configured, snapshot.config.rules.skipEmpty);
-  const pool = prepared.length > 0 ? prepared : configured.filter((view) => view.weight > 0);
   return peekNextView(pool.length > 0 ? pool : configured, current, untilIso);
 }
 

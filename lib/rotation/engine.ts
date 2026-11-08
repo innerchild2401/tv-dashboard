@@ -104,14 +104,17 @@ export function resolveRotation(now: Date, prepared: RotationCandidate[]): Rotat
   };
 }
 
-/** View that should paint when the current dwell ends (Cast SSR / classic fallback). */
+/**
+ * View that should paint when the current dwell ends (Cast SSR / classic fallback).
+ * Always treats `previous` as the view being left — required when `?view=` forces a
+ * screen that is not the wall-clock pick, otherwise nextView can lock a 2-cycle.
+ */
 export function peekNextView(prepared: RotationCandidate[], previous: ViewId, untilIso: string): ViewId {
   if (prepared.length === 0) return previous;
+  if (prepared.length === 1) return prepared[0]!.id;
   const atBoundary = new Date(untilIso);
-  if (!Number.isFinite(atBoundary.getTime())) {
-    return weightedPick(prepared, slotSeed(dateKey(zonedParts(new Date())), 0), previous).id;
-  }
-  const decision = resolveRotation(atBoundary, prepared);
-  if (decision.viewId !== previous || prepared.length === 1) return decision.viewId;
-  return weightedPick(prepared, slotSeed(dateKey(zonedParts(atBoundary)), decision.slot + 1), previous).id;
+  const parts = Number.isFinite(atBoundary.getTime()) ? zonedParts(atBoundary) : zonedParts(new Date());
+  const key = dateKey(parts);
+  const slot = Number.isFinite(atBoundary.getTime()) ? resolveRotation(atBoundary, prepared).slot : 0;
+  return weightedPick(prepared, slotSeed(key, slot), previous).id;
 }

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { ViewId } from "../i18n/ro";
 import { peekNextView, prepareCandidates, resolveRotation, weightedPick, slotSeed, type RotationCandidate } from "../lib/rotation/engine";
-import { sourceIsStale } from "../lib/state/availability";
+import { availability, sourceIsStale } from "../lib/state/availability";
 import { buildTvState } from "../lib/state/build";
 import { sampleSnapshot } from "../lib/state/sample";
 import { nextTvState, tvPathWithView } from "../lib/tv/session";
@@ -108,6 +108,15 @@ describe("rotation", () => {
     const next = peekNextView(pool, decision.viewId, decision.until);
     assert.notEqual(next, decision.viewId);
   });
+
+  it("peeks a successor of the forced view, not a wall-clock re-resolve", () => {
+    const now = zonedTimeToUtc({ year: 2026, month: 11, day: 8, hour: 14, minute: 10 });
+    const until = new Date(now.getTime() + 45_000).toISOString();
+    for (const previous of ["month", "vision", "today", "week"] as ViewId[]) {
+      const next = peekNextView(pool, previous, until);
+      assert.notEqual(next, previous, `peek after ${previous}`);
+    }
+  });
 });
 
 describe("state fallbacks", () => {
@@ -133,6 +142,22 @@ describe("state fallbacks", () => {
     assert.notEqual(chained.nextView, chained.currentView);
   });
 
+  it("keeps Azi and Săptămână in the forced ?view= Cast chain", () => {
+    let now = zonedTimeToUtc({ year: 2026, month: 11, day: 8, hour: 14, minute: 10 });
+    let force: ViewId | null = "month";
+    const counts = new Map<string, number>();
+    for (let step = 0; step < 36; step += 1) {
+      const state = buildTvState(sampleSnapshot(now), now, force);
+      assert.notEqual(state.nextView, state.currentView);
+      counts.set(state.currentView, (counts.get(state.currentView) ?? 0) + 1);
+      force = state.nextView;
+      now = new Date(new Date(state.until).getTime() + 50);
+    }
+    assert.ok((counts.get("today") ?? 0) >= 6, `today too rare: ${JSON.stringify(Object.fromEntries(counts))}`);
+    assert.ok((counts.get("week") ?? 0) >= 4, `week too rare: ${JSON.stringify(Object.fromEntries(counts))}`);
+    assert.ok((counts.get("today") ?? 0) > (counts.get("vision") ?? 0));
+  });
+
   it("reloads once during the 04:00 hour in Bucharest", () => {
     const four = new Date("2026-11-07T02:00:00.000Z");
     assert.equal(shouldNightlyReload(four, null), true);
@@ -152,5 +177,23 @@ describe("state fallbacks", () => {
       sourceIsStale([{ key: "site.visitors.today", value: 1, previous: null, fetchedAt: old, source: "manual" }], "site.", now),
       false,
     );
+  });
+
+  it("keeps Today non-empty when only the next-days strip has events", () => {
+    const now = zonedTimeToUtc({ year: 2026, month: 11, day: 8, hour: 14, minute: 0 });
+    const snapshot = sampleSnapshot(now);
+    snapshot.events = [
+      {
+        id: "later",
+        title: "Mâine",
+        start: zonedTimeToUtc({ year: 2026, month: 11, day: 9, hour: 10, minute: 0 }).toISOString(),
+        end: zonedTimeToUtc({ year: 2026, month: 11, day: 9, hour: 11, minute: 0 }).toISOString(),
+        allDay: false,
+        personId: "alex",
+      },
+    ];
+    const flags = availability(snapshot, now);
+    assert.equal(flags.today.empty, false);
+    assert.equal(flags.week.empty, false);
   });
 });

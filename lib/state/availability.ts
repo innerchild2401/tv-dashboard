@@ -26,8 +26,12 @@ export function availability(snapshot: Snapshot, now: Date): Record<ViewId, { em
   const parts = zonedParts(now);
   const today: DateParts = { year: parts.year, month: parts.month, day: parts.day };
   const lead = addDays(today, parts.hour >= snapshot.config.rules.todayLeadTomorrowHour ? 1 : 0);
-  const leadKey = dateKey(lead);
-  const todayEvents = snapshot.events.some((event) => dateKey(zonedParts(new Date(event.start))) === leadKey);
+  // Match what the Today screen paints: lead-day agenda plus the next-three strip.
+  const todayHorizon = [0, 1, 2, 3].map((step) => dateKey(addDays(lead, step)));
+  const todayEvents = snapshot.events.some((event) => {
+    const key = dateKey(zonedParts(new Date(event.start)));
+    return todayHorizon.includes(key);
+  });
 
   const weekStart = dateKey(addDays(today, -2));
   const weekEnd = dateKey(addDays(today, 4));
