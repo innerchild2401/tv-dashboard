@@ -42,7 +42,7 @@ export function availability(snapshot: Snapshot, now: Date): Record<ViewId, { em
 
   const cards = snapshot.cards.some((card) => !card.expiresAt || new Date(card.expiresAt).getTime() > now.getTime());
   const openTasks = snapshot.tasks.some((task) => !task.done);
-  const homeEmpty = !openTasks && snapshot.shopping.length === 0;
+  const homeEmpty = !openTasks && snapshot.shopping.length === 0 && snapshot.messages.length === 0;
   const momenteLive = snapshot.spotlights.some((row) => {
     const target = dateKey(zonedParts(new Date(row.startsAt)));
     const current = dateKey(today);

@@ -14,6 +14,7 @@ import {
   type EventRecord,
   type IdeaRecord,
   type InboxRecord,
+  type MessageRecord,
   type MetricRecord,
   type PersonRow,
   type PriorityRecord,
@@ -112,6 +113,7 @@ export class SupabaseStore implements AgentStore {
     for (const idea of body.ideas ?? []) await this.putIdea(idea);
     for (const metric of body.metrics ?? []) await this.putMetric(metric);
     for (const spotlight of body.spotlights ?? []) await this.putSpotlight(spotlight);
+    for (const message of body.messages ?? []) await this.putMessage(message);
     await this.drop("cards", body.drop?.cards, now);
     await this.drop("events", body.drop?.events, now);
     await this.drop("tasks", body.drop?.tasks, now);
@@ -122,6 +124,7 @@ export class SupabaseStore implements AgentStore {
     await this.drop("ideas", body.drop?.ideas, now);
     await this.drop("metrics", body.drop?.metrics, now);
     await this.drop("spotlights", body.drop?.spotlights, now);
+    await this.drop("messages", body.drop?.messages, now);
     if (body.control) await this.putControl(body.control);
   }
 
@@ -353,6 +356,27 @@ export class SupabaseStore implements AgentStore {
     if (error) throw new Error("db");
   }
 
+  async messages(): Promise<MessageRecord[]> {
+    const { data, error } = await this.db.from("messages").select("*");
+    if (error || !data) throw new Error("db");
+    return data.map(messageFrom);
+  }
+
+  async putMessage(row: MessageRecord): Promise<void> {
+    const { error } = await this.db.from("messages").upsert({
+      id: row.id,
+      text: row.text,
+      author: row.author,
+      color: row.color,
+      source: row.source,
+      locked: row.locked,
+      external_id: row.externalId,
+      deleted_at: row.deletedAt,
+      created_at: row.createdAt,
+    });
+    if (error) throw new Error("db");
+  }
+
   async control(): Promise<DisplayControl> {
     const { data, error } = await this.db.from("display_control").select("mode, view_id, pinned_until, dimmed").eq("id", 1).maybeSingle();
     if (error || !data) return { ...ROTATE_CONTROL };
@@ -402,7 +426,8 @@ export class SupabaseStore implements AgentStore {
       | "inbox_items"
       | "ideas"
       | "metrics"
-      | "spotlights",
+      | "spotlights"
+      | "messages",
     ids: string[] | undefined,
     now: Date,
   ): Promise<void> {
@@ -668,6 +693,30 @@ function spotlightFrom(row: {
     locked: row.locked,
     externalId: row.external_id,
     deletedAt: row.deleted_at,
+  };
+}
+
+function messageFrom(row: {
+  id: string;
+  text: string;
+  author: string | null;
+  color: MessageRecord["color"];
+  source: MessageRecord["source"];
+  locked: boolean;
+  external_id: string | null;
+  deleted_at: string | null;
+  created_at: string;
+}): MessageRecord {
+  return {
+    id: row.id,
+    text: row.text,
+    author: row.author,
+    color: row.color,
+    source: row.source,
+    locked: row.locked,
+    externalId: row.external_id,
+    deletedAt: row.deleted_at,
+    createdAt: row.created_at,
   };
 }
 

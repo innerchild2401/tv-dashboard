@@ -1,8 +1,18 @@
 import { ro } from "@/i18n/ro";
 import { formatCount } from "@/lib/format/display";
 import { personChip } from "@/lib/people";
-import type { HomeModel, Snapshot, SnapshotCard, VisionModel } from "@/lib/state/types";
+import type {
+  HomeDensity,
+  HomeModel,
+  HomeSticky,
+  HomeStickyColor,
+  Snapshot,
+  SnapshotCard,
+  VisionModel,
+} from "@/lib/state/types";
 import { dateKey, zonedParts } from "@/lib/time/bucharest";
+
+const STICKY_COLORS: HomeStickyColor[] = ["butter", "peach", "mint", "sky", "rose", "lemon"];
 
 export function projectVision(snapshot: Snapshot, now: Date, celebration?: string | null): VisionModel {
   const cards = snapshot.cards
@@ -50,36 +60,87 @@ function freeCell(cards: VisionModel["cards"]): { col: number; row: number } {
 
 export function projectHome(snapshot: Snapshot, now: Date): HomeModel {
   const todayKey = dateKey(zonedParts(now));
-  const tasks = [...snapshot.tasks]
-    .sort((left, right) => Number(left.done) - Number(right.done) || left.text.localeCompare(right.text, "ro"))
-    .map((task) => ({
-      id: task.id,
+  const stickies: HomeSticky[] = [];
+
+  const tasks = [...snapshot.tasks].sort(
+    (left, right) => Number(left.done) - Number(right.done) || left.text.localeCompare(right.text, "ro"),
+  );
+  for (const task of tasks) {
+    stickies.push({
+      id: `task-${task.id}`,
+      kind: "task",
+      kindLabel: ro.stickyTask,
+      color: colorOf(task.id, 0),
+      tilt: tiltOf(task.id),
       text: task.text,
       done: task.done,
-      due: task.dueDate ? (task.dueDate === todayKey ? ro.dueToday : task.dueDate) : null,
+      meta: task.dueDate ? (task.dueDate === todayKey ? ro.dueToday : task.dueDate) : null,
       person: personChip(snapshot.config.people, task.assigneeId),
-    }));
-
-  const groups = new Map<string, HomeModel["groups"][number]["items"]>();
-  const ordered = [...snapshot.shopping].sort(
-    (left, right) => Number(left.checked) - Number(right.checked) || left.text.localeCompare(right.text, "ro"),
-  );
-  for (const item of ordered) {
-    const category = item.category || ro.otherCategory;
-    const list = groups.get(category) ?? [];
-    const unit = item.unit === "l" ? "L" : item.unit;
-    const qty = unit ? `${formatCount(item.qty)} ${unit}` : item.qty === 1 ? null : formatCount(item.qty);
-    list.push({ id: item.id, text: item.text, qty, checked: item.checked });
-    groups.set(category, list);
+    });
   }
 
+  const shopping = [...snapshot.shopping].sort(
+    (left, right) => Number(left.checked) - Number(right.checked) || left.text.localeCompare(right.text, "ro"),
+  );
+  for (const item of shopping) {
+    const unit = item.unit === "l" ? "L" : item.unit;
+    const qty = unit ? `${formatCount(item.qty)} ${unit}` : item.qty === 1 ? null : formatCount(item.qty);
+    const category = item.category || ro.otherCategory;
+    stickies.push({
+      id: `shop-${item.id}`,
+      kind: "shopping",
+      kindLabel: ro.stickyShopping,
+      color: colorOf(item.id, 2),
+      tilt: tiltOf(item.id),
+      text: item.text,
+      done: item.checked,
+      meta: [qty, category].filter(Boolean).join(" · ") || null,
+      person: null,
+    });
+  }
+
+  const messages = [...snapshot.messages].sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+  for (const message of messages) {
+    stickies.push({
+      id: `msg-${message.id}`,
+      kind: "message",
+      kindLabel: ro.stickyMessage,
+      color: message.color,
+      tilt: tiltOf(message.id),
+      text: message.text,
+      done: false,
+      meta: message.author,
+      person: null,
+    });
+  }
+
+  const live = stickies.filter((sticky) => !sticky.done);
+  const density = densityOf(live.length || stickies.length);
+
   return {
-    tasks,
+    stickies,
+    density,
     inboxWaiting: snapshot.inboxWaiting,
-    groups: [...groups.entries()]
-      .sort((left, right) => left[0].localeCompare(right[0], "ro"))
-      .map(([category, items]) => ({ category, items })),
+    emptyLabel: stickies.length === 0 ? ro.emptyBoard : null,
   };
+}
+
+function densityOf(count: number): HomeDensity {
+  if (count <= 6) return "roomy";
+  if (count <= 12) return "cozy";
+  return "packed";
+}
+
+function colorOf(id: string, salt: number): HomeStickyColor {
+  let hash = salt;
+  for (let index = 0; index < id.length; index += 1) hash = (hash * 31 + id.charCodeAt(index)) | 0;
+  return STICKY_COLORS[Math.abs(hash) % STICKY_COLORS.length] ?? "butter";
+}
+
+function tiltOf(id: string): number {
+  let hash = 0;
+  for (let index = 0; index < id.length; index += 1) hash = (hash * 17 + id.charCodeAt(index)) | 0;
+  return (Math.abs(hash) % 7) - 3;
 }
 
 function toCard(card: SnapshotCard, snapshot: Snapshot, now: Date): VisionModel["cards"][number] {

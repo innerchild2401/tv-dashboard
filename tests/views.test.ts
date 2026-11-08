@@ -108,7 +108,11 @@ describe("calendar views", () => {
     const vision = buildTvState(snapshot, morning, "vision").vision;
     assert.ok((vision?.cards.length ?? 0) >= 6);
     const home = buildTvState(snapshot, morning, "home").home;
-    assert.equal(home?.groups.length, 3);
+    assert.ok((home?.stickies.length ?? 0) >= 4);
+    assert.ok(home?.stickies.some((sticky) => sticky.kind === "task"));
+    assert.ok(home?.stickies.some((sticky) => sticky.kind === "shopping"));
+    assert.ok(home?.stickies.some((sticky) => sticky.kind === "message"));
+    assert.equal(["roomy", "cozy", "packed"].includes(home?.density ?? ""), true);
   });
 });
 

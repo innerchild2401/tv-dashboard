@@ -14,8 +14,12 @@ export const TOOL_NAMES = [
   "route_inbox_item",
   "upsert_events",
   "upsert_task",
+  "delete_task",
   "shopping_add",
   "shopping_check",
+  "shopping_delete",
+  "upsert_message",
+  "delete_message",
   "set_metric",
   "pin_view",
   "undo",
@@ -29,6 +33,7 @@ export type Source = "manual" | "assistant" | "integration";
 export type CardKind = "photo" | "affirmation" | "countdown" | "word" | "progress" | "wins" | "recap" | "note";
 export type SpotlightKind = "trip" | "competition" | "deadline" | "other";
 export type Palette = "sand" | "coral" | "lilac" | "mint" | "sky" | "pink";
+export type MessageColor = "butter" | "peach" | "mint" | "sky" | "rose" | "lemon";
 export type InboxStatus = "new" | "routed" | "needs_review";
 
 export type ToolResult = {
@@ -170,6 +175,18 @@ export type SpotlightRecord = {
   deletedAt: string | null;
 };
 
+export type MessageRecord = {
+  id: string;
+  text: string;
+  author: string | null;
+  color: MessageColor;
+  source: Source;
+  locked: boolean;
+  externalId: string | null;
+  deletedAt: string | null;
+  createdAt: string;
+};
+
 export type UndoBody = {
   cards?: CardRecord[];
   events?: EventRecord[];
@@ -181,8 +198,12 @@ export type UndoBody = {
   ideas?: IdeaRecord[];
   metrics?: MetricRecord[];
   spotlights?: SpotlightRecord[];
+  messages?: MessageRecord[];
   drop?: Partial<
-    Record<"cards" | "events" | "tasks" | "shopping" | "recaps" | "priorities" | "inbox" | "ideas" | "metrics" | "spotlights", string[]>
+    Record<
+      "cards" | "events" | "tasks" | "shopping" | "recaps" | "priorities" | "inbox" | "ideas" | "metrics" | "spotlights" | "messages",
+      string[]
+    >
   >;
   control?: DisplayControl;
   expectControl?: DisplayControl;
@@ -238,6 +259,8 @@ export interface AgentStore {
   putMetric(row: MetricRecord): Promise<void>;
   spotlights(): Promise<SpotlightRecord[]>;
   putSpotlight(row: SpotlightRecord): Promise<void>;
+  messages(): Promise<MessageRecord[]>;
+  putMessage(row: MessageRecord): Promise<void>;
   control(): Promise<DisplayControl>;
   putControl(control: DisplayControl): Promise<void>;
   saveImage(bytes: Uint8Array, type: ImageKind): Promise<string>;

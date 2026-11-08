@@ -143,6 +143,17 @@ values (
   'idea-quiet-evening'
 );
 
+insert into public.messages (id, text, author, color, source, locked, external_id)
+values (
+  '88888888-8888-4888-8888-888888888801',
+  'Bine ați venit acasă!',
+  'Alex',
+  'peach',
+  'assistant',
+  false,
+  'msg-welcome'
+);
+
 -- Extra sample rows for the week, month, vision board, site and TikTok screens.
 insert into public.events (id, title, starts_at, ends_at, all_day, person_id, source, locked, external_id)
 select
