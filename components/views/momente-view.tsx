@@ -32,6 +32,7 @@ export function MomenteView({ view }: { view: MomenteModel }) {
                 </span>
                 {item.unitLabel ? <span className="momente-unit">{item.unitLabel}</span> : null}
               </div>
+              {item.dueLabel ? <p className="momente-due">{item.dueLabel}</p> : null}
               {item.note ? <p className="momente-note">{item.note}</p> : null}
             </article>
           ))}

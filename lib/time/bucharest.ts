@@ -100,6 +100,20 @@ export function formatShortDate(date: Date, timeZone = TIME_ZONE): string {
   );
 }
 
+/** Momente TV due label, e.g. "13 nov · 18:00" in Europe/Bucharest. */
+export function formatMomenteDue(date: Date | string, timeZone = TIME_ZONE): string {
+  const instant = typeof date === "string" ? new Date(date) : date;
+  const parts = zonedParts(instant, timeZone);
+  const month = new Intl.DateTimeFormat("ro-RO", {
+    timeZone,
+    month: "short",
+  })
+    .format(instant)
+    .replace(/\.$/, "")
+    .toLocaleLowerCase("ro-RO");
+  return `${parts.day} ${month} · ${pad(parts.hour)}:${pad(parts.minute)}`;
+}
+
 export function formatDuration(ms: number): string {
   const minutes = Math.max(0, Math.round(ms / 60000));
   const hours = Math.floor(minutes / 60);

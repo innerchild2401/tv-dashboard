@@ -156,6 +156,8 @@ export type MomenteItem = {
   days: number;
   daysLabel: string;
   unitLabel: string | null;
+  /** Absolute due instant in Bucharest, e.g. "13 nov · 18:00". */
+  dueLabel: string;
   today: boolean;
 };
 

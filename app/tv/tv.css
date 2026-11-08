@@ -619,6 +619,7 @@
 .momente-overflow,
 .momente-empty,
 .momente-kind,
+.momente-due,
 .momente-note,
 .momente-unit {
   margin: 0;
@@ -773,6 +774,22 @@
 
 .momente-unit {
   font-size: 24px;
+}
+
+.momente-due {
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 22px;
+  letter-spacing: 0.02em;
+  color: rgba(243, 239, 230, 0.88);
+}
+
+.momente--1 .momente-due {
+  font-size: 28px;
+}
+
+.momente--dense .momente-due,
+.momente--overflow .momente-due {
+  font-size: 18px;
 }
 
 .momente-note {
