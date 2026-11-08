@@ -87,14 +87,14 @@ export function evaluateRules(input: {
 
   const profile = rules.timeOfDay ? activeProfile(input.config, input.now) : null;
   if (profile) notices.unshift({ id: "timeOfDay", reason: `${ro.profile}: ${profileLabel(profile.id)}` });
-  let pool = profile ? applyProfile(input.candidates, profile) : input.candidates.map((view) => ({ ...view }));
-  const skipEmpty = rules.skipEmpty;
-  const prepared = prepareCandidates(pool, skipEmpty);
-  pool = prepared.length > 0 ? prepared : pool.filter((view) => view.weight > 0);
-  if (birthdays.length > 0) pool = includeView(pool, input.candidates, "vision");
-  if (siteSpike) pool = includeView(pool, input.candidates, "site");
-  if (tiktokSpike) pool = includeView(pool, input.candidates, "tiktok");
-  if (pool.length === 0) pool = input.candidates.filter((view) => view.weight > 0);
+  const pool = rotationPool({
+    now: input.now,
+    config: input.config,
+    candidates: input.candidates,
+    birthdays: birthdays.length > 0,
+    siteSpike: Boolean(siteSpike),
+    tiktokSpike: Boolean(tiktokSpike),
+  });
 
   const interruptReason = soonEvent
     ? eventSoon(soonEvent.title, soonEvent.minutes)
@@ -118,6 +118,27 @@ export function evaluateRules(input: {
     alert,
     priorityEverywhere: Boolean(soonEvent || priorityDue),
   };
+}
+
+/** Profile + skipEmpty + celebration boosts — same pool evaluateRules rotates through. */
+export function rotationPool(input: {
+  now: Date;
+  config: DashboardConfig;
+  candidates: RotationCandidate[];
+  birthdays?: boolean;
+  siteSpike?: boolean;
+  tiktokSpike?: boolean;
+}): RotationCandidate[] {
+  const rules = input.config.rules;
+  const profile = rules.timeOfDay ? activeProfile(input.config, input.now) : null;
+  let pool = profile ? applyProfile(input.candidates, profile) : input.candidates.map((view) => ({ ...view }));
+  const prepared = prepareCandidates(pool, rules.skipEmpty);
+  pool = prepared.length > 0 ? prepared : pool.filter((view) => view.weight > 0);
+  if (input.birthdays) pool = includeView(pool, input.candidates, "vision");
+  if (input.siteSpike) pool = includeView(pool, input.candidates, "site");
+  if (input.tiktokSpike) pool = includeView(pool, input.candidates, "tiktok");
+  if (pool.length === 0) pool = input.candidates.filter((view) => view.weight > 0);
+  return pool;
 }
 
 export function activePriority(priorities: SnapshotPriority[], now: Date): SnapshotPriority | null {
