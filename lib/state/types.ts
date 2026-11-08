@@ -101,7 +101,6 @@ export type Snapshot = {
     hours?: { time: string; code: number; precipitationMm: number }[];
   };
   calendarFetchedAt: string | null;
-  tiktokVideoTitle?: string | null;
 };
 
 export type ChromeModel = {
@@ -168,27 +167,6 @@ export type MomenteModel = {
   emptyLabel: string;
 };
 
-export type StatModel = { label: string; value: string; delta: string | null };
-
-export type SiteModel = {
-  stats: StatModel[];
-  series: number[];
-  updatedLabel: string | null;
-  pages: { label: string; value: string }[];
-  sources: { label: string; value: string }[];
-  celebration: string | null;
-};
-
-export type TikTokModel = {
-  followers: StatModel;
-  views: StatModel;
-  likes: StatModel;
-  bars: { label: string; value: number }[];
-  video: { title: string; views: string; likes: string } | null;
-  updatedLabel: string | null;
-  celebration: string | null;
-};
-
 export type VisionCardModel = {
   id: string;
   kind: SnapshotCard["kind"];
@@ -233,8 +211,6 @@ export type TvState = {
   today: TodayModel | null;
   week: WeekModel | null;
   momente: MomenteModel | null;
-  site: SiteModel | null;
-  tiktok: TikTokModel | null;
   vision: VisionModel | null;
   home: HomeModel | null;
 };

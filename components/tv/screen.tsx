@@ -3,8 +3,6 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { HomeView } from "@/components/views/home-view";
 import { MomenteView } from "@/components/views/momente-view";
-import { SiteView } from "@/components/views/site-view";
-import { TikTokView } from "@/components/views/tiktok-view";
 import { TodayView } from "@/components/views/today-view";
 import { VisionView } from "@/components/views/vision-view";
 import { WeekView } from "@/components/views/week-view";
@@ -187,8 +185,6 @@ function ViewBody({ state }: { state: TvState }) {
   if (state.currentView === "today" && state.today) return <TodayView view={state.today} />;
   if (state.currentView === "week" && state.week) return <WeekView view={state.week} />;
   if (state.currentView === "momente" && state.momente) return <MomenteView view={state.momente} />;
-  if (state.currentView === "site" && state.site) return <SiteView view={state.site} />;
-  if (state.currentView === "tiktok" && state.tiktok) return <TikTokView view={state.tiktok} />;
   if (state.currentView === "vision" && state.vision) return <VisionView view={state.vision} />;
   if (state.currentView === "home" && state.home) return <HomeView view={state.home} />;
   return null;

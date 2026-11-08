@@ -8,22 +8,20 @@ values (
   '{"mode":"dark","accent":"teal","fonts":{"body":"Inter","display":"Space Grotesk"}}'::jsonb,
   '[{"id":"alex","name":"Alex","color":"#7AA7FF"},{"id":"mara","name":"Mara","color":"#FFB86B"}]'::jsonb,
   '[
-    {"id":"today","enabled":true,"order":1,"dwellSeconds":45,"weight":3},
-    {"id":"week","enabled":true,"order":2,"dwellSeconds":45,"weight":2},
-    {"id":"momente","enabled":true,"order":3,"dwellSeconds":45,"weight":1},
-    {"id":"site","enabled":true,"order":4,"dwellSeconds":45,"weight":1},
-    {"id":"tiktok","enabled":true,"order":5,"dwellSeconds":45,"weight":1},
-    {"id":"vision","enabled":true,"order":6,"dwellSeconds":45,"weight":1},
-    {"id":"home","enabled":true,"order":7,"dwellSeconds":45,"weight":1}
+    {"id":"today","enabled":true,"order":1,"dwellSeconds":120,"weight":1},
+    {"id":"week","enabled":true,"order":2,"dwellSeconds":120,"weight":1},
+    {"id":"momente","enabled":true,"order":3,"dwellSeconds":120,"weight":1},
+    {"id":"vision","enabled":true,"order":4,"dwellSeconds":120,"weight":1},
+    {"id":"home","enabled":true,"order":5,"dwellSeconds":120,"weight":1}
   ]'::jsonb,
   '[
-    {"id":"morning","start":"06:00","end":"10:00","views":[{"id":"today","weight":3,"dwellSeconds":60},{"id":"week","weight":2,"dwellSeconds":45},{"id":"vision","weight":1,"dwellSeconds":45}]},
-    {"id":"daytime","start":"10:00","end":"18:00","views":[{"id":"today","weight":3,"dwellSeconds":45},{"id":"week","weight":2,"dwellSeconds":45},{"id":"momente","weight":1,"dwellSeconds":45},{"id":"home","weight":1,"dwellSeconds":45},{"id":"vision","weight":1,"dwellSeconds":45}]},
-    {"id":"evening","start":"18:00","end":"23:00","views":[{"id":"today","weight":2,"dwellSeconds":45},{"id":"vision","weight":2,"dwellSeconds":45},{"id":"site","weight":1,"dwellSeconds":45},{"id":"tiktok","weight":1,"dwellSeconds":45},{"id":"home","weight":1,"dwellSeconds":45}]}
+    {"id":"morning","start":"06:00","end":"10:00","views":[{"id":"today","weight":1,"dwellSeconds":120},{"id":"week","weight":1,"dwellSeconds":120},{"id":"momente","weight":1,"dwellSeconds":120},{"id":"vision","weight":1,"dwellSeconds":120},{"id":"home","weight":1,"dwellSeconds":120}]},
+    {"id":"daytime","start":"10:00","end":"18:00","views":[{"id":"today","weight":1,"dwellSeconds":120},{"id":"week","weight":1,"dwellSeconds":120},{"id":"momente","weight":1,"dwellSeconds":120},{"id":"vision","weight":1,"dwellSeconds":120},{"id":"home","weight":1,"dwellSeconds":120}]},
+    {"id":"evening","start":"18:00","end":"23:00","views":[{"id":"today","weight":1,"dwellSeconds":120},{"id":"week","weight":1,"dwellSeconds":120},{"id":"momente","weight":1,"dwellSeconds":120},{"id":"vision","weight":1,"dwellSeconds":120},{"id":"home","weight":1,"dwellSeconds":120}]}
   ]'::jsonb,
   '{"start":"23:00","end":"06:00"}'::jsonb,
   '{"name":"Constanța","latitude":44.1598,"longitude":28.6348,"timezone":"Europe/Bucharest"}'::jsonb,
-  '{"todayLeadTomorrowHour":20,"skipEmpty":true,"quietHours":true,"interrupts":true,"timeOfDay":true,"eventProximity":true,"priorityBanner":true,"celebrations":true,"weatherAlert":true}'::jsonb
+  '{"todayLeadTomorrowHour":20,"skipEmpty":true,"quietHours":true,"interrupts":true,"timeOfDay":false,"eventProximity":true,"priorityBanner":true,"celebrations":true,"weatherAlert":true}'::jsonb
 );
 
 insert into public.tasks (id, text, done, assignee_id, due_date, source, locked, external_id)

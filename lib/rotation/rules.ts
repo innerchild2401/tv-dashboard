@@ -1,5 +1,4 @@
 import {
-  aboveAverage,
   celebrationDay,
   eventSoon,
   prioritySoon,
@@ -10,13 +9,13 @@ import {
   type ViewId,
 } from "@/i18n/ro";
 import { isRain, type ForecastHour } from "@/lib/adapters/weather";
-import { prepareCandidates, resolveRotation, slotSeed, weightedPick, type RotationCandidate, type RotationDecision } from "@/lib/rotation/engine";
-import type { DashboardConfig, SnapshotEvent, SnapshotMetric, SnapshotPriority } from "@/lib/state/types";
+import { nextInOrder, prepareCandidates, resolveRotation, type RotationCandidate, type RotationDecision } from "@/lib/rotation/engine";
+import type { DashboardConfig, SnapshotEvent, SnapshotPriority } from "@/lib/state/types";
 import { addDays, dateKey, zonedParts, zonedTimeToUtc } from "@/lib/time/bucharest";
 
 export type RuleNotice = { id: string; reason: string };
 
-export type Celebration = { view: "vision" | "site" | "tiktok"; text: string };
+export type Celebration = { view: "vision"; text: string };
 
 export type RuleDecision = RotationDecision & {
   quiet: boolean;
@@ -39,7 +38,7 @@ export function evaluateRules(input: {
   config: DashboardConfig;
   events: SnapshotEvent[];
   priorities: SnapshotPriority[];
-  metrics: SnapshotMetric[];
+  metrics: unknown[];
   forecast: ForecastHour[];
   candidates: RotationCandidate[];
 }): RuleDecision {
@@ -50,8 +49,6 @@ export function evaluateRules(input: {
   const soonEvent = rules.eventProximity ? nextEvent(input.events, input.now) : null;
   const priorityDue = Boolean(rules.priorityBanner && priority?.dueAt && dueWithin(priority.dueAt, input.now));
   const birthdays = rules.celebrations ? birthdayTitles(input.events, input.now) : [];
-  const siteSpike = rules.celebrations && beatsAverage(input.metrics, "site.day.", input.now);
-  const tiktokSpike = rules.celebrations && beatsAverage(input.metrics, "tiktok.views.day.", input.now);
   const alert = rules.weatherAlert ? rainAlert(input.events, input.forecast, input.now) : null;
 
   if (soonEvent) notices.push({ id: "eventProximity", reason: eventSoon(soonEvent.title, soonEvent.minutes) });
@@ -61,8 +58,6 @@ export function evaluateRules(input: {
     notices.push({ id: "priorityBanner", reason: priority.reason });
   }
   for (const title of birthdays) celebrations.push({ view: "vision", text: celebrationDay(title) });
-  if (siteSpike) celebrations.push({ view: "site", text: aboveAverage(ro.views.site) });
-  if (tiktokSpike) celebrations.push({ view: "tiktok", text: aboveAverage(ro.views.tiktok) });
   for (const item of celebrations) notices.push({ id: "celebrations", reason: item.text });
   if (alert) notices.push({ id: "weatherAlert", reason: alert });
 
@@ -92,8 +87,6 @@ export function evaluateRules(input: {
     config: input.config,
     candidates: input.candidates,
     birthdays: birthdays.length > 0,
-    siteSpike: Boolean(siteSpike),
-    tiktokSpike: Boolean(tiktokSpike),
   });
 
   const interruptReason = soonEvent
@@ -126,8 +119,6 @@ export function rotationPool(input: {
   config: DashboardConfig;
   candidates: RotationCandidate[];
   birthdays?: boolean;
-  siteSpike?: boolean;
-  tiktokSpike?: boolean;
 }): RotationCandidate[] {
   const rules = input.config.rules;
   const profile = rules.timeOfDay ? activeProfile(input.config, input.now) : null;
@@ -135,8 +126,6 @@ export function rotationPool(input: {
   const prepared = prepareCandidates(pool, rules.skipEmpty);
   pool = prepared.length > 0 ? prepared : pool.filter((view) => view.weight > 0);
   if (input.birthdays) pool = includeView(pool, input.candidates, "vision");
-  if (input.siteSpike) pool = includeView(pool, input.candidates, "site");
-  if (input.tiktokSpike) pool = includeView(pool, input.candidates, "tiktok");
   if (pool.length === 0) pool = input.candidates.filter((view) => view.weight > 0);
   return pool;
 }
@@ -162,7 +151,6 @@ function resolveWithInterrupt(now: Date, prepared: RotationCandidate[], reason: 
   }
   const parts = zonedParts(now);
   const dayStart = zonedTimeToUtc({ year: parts.year, month: parts.month, day: parts.day, hour: 0, minute: 0 }).getTime();
-  const key = dateKey(parts);
   const cycle = Math.max(prepared.length, 1);
   let cursor = dayStart;
   let previous: ViewId | null = null;
@@ -181,7 +169,7 @@ function resolveWithInterrupt(now: Date, prepared: RotationCandidate[], reason: 
       phase = 1;
       continue;
     }
-    const view = weightedPick(prepared, slotSeed(key, slot), previous);
+    const view = nextInOrder(prepared, previous);
     const until = cursor + view.dwellSeconds * 1000;
     if (nowMs < until) {
       return {
@@ -297,22 +285,6 @@ function birthdayTitles(events: SnapshotEvent[], now: Date): string[] {
     if (!titles.includes(event.title)) titles.push(event.title);
   }
   return titles;
-}
-
-function beatsAverage(metrics: SnapshotMetric[], prefix: string, now: Date): boolean {
-  const today = dateKey(zonedParts(now));
-  const points = metrics
-    .filter((metric) => metric.key.startsWith(prefix))
-    .map((metric) => ({ date: metric.key.slice(prefix.length), value: metric.value }))
-    .filter((point) => /^\d{4}-\d{2}-\d{2}$/.test(point.date));
-  const current = points.find((point) => point.date === today);
-  const prior = points
-    .filter((point) => point.date < today)
-    .sort((left, right) => left.date.localeCompare(right.date))
-    .slice(-7);
-  if (!current || prior.length < 3) return false;
-  const average = prior.reduce((sum, point) => sum + point.value, 0) / prior.length;
-  return average > 0 && current.value > average * 2;
 }
 
 function rainAlert(events: SnapshotEvent[], forecast: ForecastHour[], now: Date): string | null {

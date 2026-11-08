@@ -47,9 +47,9 @@ describe("phone PIN and session", () => {
 
 describe("phone controls reach the TV state", () => {
   const views = [
-    { id: "today" as const, enabled: true, order: 1, dwellSeconds: 45, weight: 3 },
-    { id: "week" as const, enabled: true, order: 2, dwellSeconds: 45, weight: 2 },
-    { id: "home" as const, enabled: true, order: 3, dwellSeconds: 45, weight: 1 },
+    { id: "today" as const, enabled: true, order: 1, dwellSeconds: 120, weight: 1 },
+    { id: "week" as const, enabled: true, order: 2, dwellSeconds: 120, weight: 1 },
+    { id: "home" as const, enabled: true, order: 3, dwellSeconds: 120, weight: 1 },
   ];
 
   it("locks a view, dims without switching, and drops an expired pin", () => {

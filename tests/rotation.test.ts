@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { ViewId } from "../i18n/ro";
-import { peekNextView, prepareCandidates, resolveRotation, weightedPick, slotSeed, type RotationCandidate } from "../lib/rotation/engine";
+import { nextInOrder, peekNextView, prepareCandidates, resolveRotation, type RotationCandidate } from "../lib/rotation/engine";
 import { availability, sourceIsStale } from "../lib/state/availability";
 import { buildTvState } from "../lib/state/build";
 import { sampleSnapshot } from "../lib/state/sample";
@@ -9,19 +9,17 @@ import { nextTvState, tvPathWithView } from "../lib/tv/session";
 import { shouldNightlyReload } from "../lib/tv/reload";
 import { zonedTimeToUtc } from "../lib/time/bucharest";
 
-function candidate(id: ViewId, weight: number, dwellSeconds = 45, empty = false, stale = false): RotationCandidate {
+function candidate(id: ViewId, weight = 1, dwellSeconds = 120, empty = false, stale = false): RotationCandidate {
   return { id, weight, dwellSeconds, empty, stale };
 }
 
 describe("rotation", () => {
   const pool = [
-    candidate("today", 3),
-    candidate("week", 2),
-    candidate("momente", 1),
-    candidate("site", 1),
-    candidate("tiktok", 1),
-    candidate("vision", 1),
-    candidate("home", 1),
+    candidate("today"),
+    candidate("week"),
+    candidate("momente"),
+    candidate("vision"),
+    candidate("home"),
   ];
 
   it("picks the same view for the same moment", () => {
@@ -30,8 +28,8 @@ describe("rotation", () => {
     const second = resolveRotation(now, pool);
     assert.equal(first.viewId, second.viewId);
     assert.equal(first.until, second.until);
-    assert.equal(first.dwellSeconds, 45);
-    assert.equal(new Date(first.until).getTime() - now.getTime() <= 45_000, true);
+    assert.equal(first.dwellSeconds, 120);
+    assert.equal(new Date(first.until).getTime() - now.getTime() <= 120_000, true);
   });
 
   it("does not repeat the previous view when another candidate exists", () => {
@@ -46,43 +44,57 @@ describe("rotation", () => {
     }
   });
 
-  it("gives the heavier view more slots across a morning", () => {
-    const counts = new Map<string, number>();
-    let cursor = zonedTimeToUtc({ year: 2026, month: 11, day: 7, hour: 8, minute: 0 });
-    const end = cursor.getTime() + 3 * 60 * 60 * 1000;
-    while (cursor.getTime() < end) {
+  it("walks the pool in config order as a round-robin", () => {
+    const start = zonedTimeToUtc({ year: 2026, month: 11, day: 7, hour: 0, minute: 0 });
+    const seen: string[] = [];
+    let cursor = start;
+    for (let step = 0; step < pool.length * 2; step += 1) {
       const decision = resolveRotation(new Date(cursor.getTime() + 500), pool);
-      counts.set(decision.viewId, (counts.get(decision.viewId) ?? 0) + 1);
+      seen.push(decision.viewId);
       cursor = new Date(decision.until);
     }
-    assert.ok((counts.get("today") ?? 0) > (counts.get("momente") ?? 0));
+    assert.deepEqual(seen, [
+      "today",
+      "week",
+      "momente",
+      "vision",
+      "home",
+      "today",
+      "week",
+      "momente",
+      "vision",
+      "home",
+    ]);
   });
 
-  it("moves an empty Today onto Week and skips an empty Home", () => {
+  it("skips empty Today and Home without transferring weight", () => {
     const prepared = prepareCandidates(
       [
-        candidate("today", 3, 45, true),
-        candidate("week", 2),
-        candidate("home", 1, 45, true),
-        candidate("vision", 1),
+        candidate("today", 1, 120, true),
+        candidate("week"),
+        candidate("home", 1, 120, true),
+        candidate("vision"),
       ],
       true,
     );
     assert.deepEqual(
-      prepared.map((view) => [view.id, view.weight]),
-      [
-        ["week", 5],
-        ["vision", 1],
-      ],
+      prepared.map((view) => view.id),
+      ["week", "vision"],
     );
   });
 
   it("keeps a stale view only when it is the only candidate", () => {
-    const staleSite = candidate("site", 1, 45, false, true);
-    const dropped = prepareCandidates([staleSite, candidate("today", 3)], true);
-    assert.deepEqual(dropped.map((view) => view.id), ["today"]);
-    const kept = prepareCandidates([staleSite], true);
-    assert.deepEqual(kept.map((view) => view.id), ["site"]);
+    const staleHome = candidate("home", 1, 120, false, true);
+    const dropped = prepareCandidates([staleHome, candidate("today")], true);
+    assert.deepEqual(
+      dropped.map((view) => view.id),
+      ["today"],
+    );
+    const kept = prepareCandidates([staleHome], true);
+    assert.deepEqual(
+      kept.map((view) => view.id),
+      ["home"],
+    );
   });
 
   it("uses the chosen dwell when views disagree", () => {
@@ -95,11 +107,10 @@ describe("rotation", () => {
     assert.equal(new Date(second.until).getTime() - new Date(first.until).getTime(), second.dwellSeconds * 1000);
   });
 
-  it("seeds a slot from the day and the slot number", () => {
-    assert.equal(slotSeed("2026-11-07", 1), slotSeed("2026-11-07", 1));
-    assert.notEqual(slotSeed("2026-11-07", 1), slotSeed("2026-11-07", 2));
-    const pick = weightedPick(pool, slotSeed("2026-11-07", 4), "today");
-    assert.notEqual(pick.id, "today");
+  it("picks the next view after previous in order", () => {
+    assert.equal(nextInOrder(pool, "today").id, "week");
+    assert.equal(nextInOrder(pool, "home").id, "today");
+    assert.equal(nextInOrder(pool, null).id, "today");
   });
 
   it("peeks a different view at the dwell boundary", () => {
@@ -111,7 +122,7 @@ describe("rotation", () => {
 
   it("peeks a successor of the forced view, not a wall-clock re-resolve", () => {
     const now = zonedTimeToUtc({ year: 2026, month: 11, day: 8, hour: 14, minute: 10 });
-    const until = new Date(now.getTime() + 45_000).toISOString();
+    const until = new Date(now.getTime() + 120_000).toISOString();
     for (const previous of ["momente", "vision", "today", "week"] as ViewId[]) {
       const next = peekNextView(pool, previous, until);
       assert.notEqual(next, previous, `peek after ${previous}`);
@@ -142,20 +153,20 @@ describe("state fallbacks", () => {
     assert.notEqual(chained.nextView, chained.currentView);
   });
 
-  it("keeps Azi and Săptămână in the forced ?view= Cast chain", () => {
+  it("rotates every remaining view fairly in the forced ?view= Cast chain", () => {
     let now = zonedTimeToUtc({ year: 2026, month: 11, day: 8, hour: 14, minute: 10 });
     let force: ViewId | null = "momente";
     const counts = new Map<string, number>();
-    for (let step = 0; step < 36; step += 1) {
+    for (let step = 0; step < 25; step += 1) {
       const state = buildTvState(sampleSnapshot(now), now, force);
       assert.notEqual(state.nextView, state.currentView);
       counts.set(state.currentView, (counts.get(state.currentView) ?? 0) + 1);
       force = state.nextView;
       now = new Date(new Date(state.until).getTime() + 50);
     }
-    assert.ok((counts.get("today") ?? 0) >= 6, `today too rare: ${JSON.stringify(Object.fromEntries(counts))}`);
-    assert.ok((counts.get("week") ?? 0) >= 4, `week too rare: ${JSON.stringify(Object.fromEntries(counts))}`);
-    assert.ok((counts.get("today") ?? 0) > (counts.get("vision") ?? 0));
+    for (const id of ["today", "week", "momente", "vision", "home"] as ViewId[]) {
+      assert.ok((counts.get(id) ?? 0) >= 4, `${id} starved: ${JSON.stringify(Object.fromEntries(counts))}`);
+    }
   });
 
   it("reloads once during the 04:00 hour in Bucharest", () => {
@@ -170,11 +181,11 @@ describe("state fallbacks", () => {
     const now = new Date("2026-11-07T12:00:00.000Z");
     const old = new Date(now.getTime() - 25 * 60 * 60 * 1000).toISOString();
     assert.equal(
-      sourceIsStale([{ key: "site.visitors.today", value: 1, previous: null, fetchedAt: old, source: "integration" }], "site.", now),
+      sourceIsStale([{ key: "custom.metric", value: 1, previous: null, fetchedAt: old, source: "integration" }], "custom.", now),
       true,
     );
     assert.equal(
-      sourceIsStale([{ key: "site.visitors.today", value: 1, previous: null, fetchedAt: old, source: "manual" }], "site.", now),
+      sourceIsStale([{ key: "custom.metric", value: 1, previous: null, fetchedAt: old, source: "manual" }], "custom.", now),
       false,
     );
   });
