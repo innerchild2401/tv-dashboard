@@ -17,10 +17,7 @@ export const sampleConfig = {
     accent: "teal",
     fonts: { body: "Inter", display: "Space Grotesk" },
   },
-  people: [
-    { id: "alex" as const, name: "Alex", color: "#7AA7FF" },
-    { id: "mara" as const, name: "Mara", color: "#FFB86B" },
-  ],
+  people: [{ id: "alex" as const, name: "Alex", color: "#7AA7FF" }],
   views: [
     equal("today" as ViewId, 1),
     equal("week" as ViewId, 2),

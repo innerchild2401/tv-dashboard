@@ -192,7 +192,7 @@ async function storeEvents(
 }
 
 async function loadPeople(supabase: Client): Promise<{ id: string }[]> {
-  const fallback = [{ id: "alex" }, { id: "mara" }];
+  const fallback = [{ id: "alex" }];
   const { data, error } = await supabase.from("config").select("people").eq("id", 1).maybeSingle();
   if (error || !data) return fallback;
   const parsed = configSchema.shape.people.safeParse(data.people);

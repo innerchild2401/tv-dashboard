@@ -21,7 +21,7 @@ describe("Today projection", () => {
     const view = projectToday(sampleSchedule, new Date("2026-11-07T16:00:00.000Z"));
     assert.equal(view.lead, "today");
     assert.equal(view.clock, "18:00");
-    assert.equal(view.agenda.find((item) => item.title === "Piață")?.state, "past");
+    assert.equal(view.agenda.find((item) => item.title === "Prânz")?.state, "past");
     assert.equal(view.nextEvent?.title, "Cină");
     assert.equal(view.nextEvent?.countdown, "1 h 00 min");
     assert.equal(view.nowBeforeId, view.agenda.find((item) => item.title === "Cină")?.id);
@@ -32,10 +32,11 @@ describe("Today projection", () => {
     assert.equal(view.lead, "tomorrow");
     assert.equal(view.clock, "20:00");
     assert.equal(view.showNowLine, false);
-    assert.equal(view.agenda[0]?.title, "Control medical");
-    assert.equal(view.nextEvent?.countdown, "14 h 00 min");
+    assert.equal(view.agenda[0]?.title, "Film");
+    assert.equal(view.nextEvent?.countdown, "22 h 30 min");
     assert.ok(view.priority);
-    assert.equal(view.nextDays[0]?.titles[0], "Cumpărături");
+    assert.deepEqual(view.nextDays[0]?.titles, []);
+    assert.equal(view.nextDays[1]?.titles[0], "Plimbare pe faleză");
     assert.equal(view.views.find((item) => item.active)?.dwellLabel, "120s");
   });
 });

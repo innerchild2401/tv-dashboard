@@ -105,7 +105,7 @@ describe("smart rules", () => {
       start: morning.toISOString(),
       end: new Date(morning.getTime() + 60 * 60 * 1000).toISOString(),
       allDay: true,
-      personId: "mara",
+      personId: "alex",
     });
     const on = buildTvState(snapshot, morning, "vision");
     assert.equal(on.vision?.cards.some((card) => card.body?.includes("Aniversare")), true);

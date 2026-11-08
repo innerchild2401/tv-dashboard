@@ -12,8 +12,8 @@ describe("calendar refresh policy", () => {
     assert.equal(calendarUrlFromEnv("alex", { ICAL_URL_ALEX: "not a url" }), null);
     assert.equal(calendarUrlFromEnv("alex", { ICAL_URL_ALEX: "http://calendar.example.test/a.ics" }), null);
     assert.equal(
-      calendarUrlFromEnv("mara", { ICAL_URL_MARA: "https://calendar.example.test/mara.ics" }),
-      "https://calendar.example.test/mara.ics",
+      calendarUrlFromEnv("alex", { ICAL_URL_ALEX: "https://calendar.example.test/alex.ics" }),
+      "https://calendar.example.test/alex.ics",
     );
     const missing = outcomeFromFeed({ url: null, due: true, fetched: null, personId: "alex", now });
     assert.deepEqual(missing, { status: "unconfigured", replace: false });
