@@ -40,17 +40,19 @@ export function availability(snapshot: Snapshot, now: Date): Record<ViewId, { em
     return key >= weekStart && key <= weekEnd;
   });
 
-  const monthKeys = monthKeysFor(today);
-  const monthEvents = snapshot.events.some((event) => monthKeys.has(dateKey(zonedParts(new Date(event.start)))));
-
   const cards = snapshot.cards.some((card) => !card.expiresAt || new Date(card.expiresAt).getTime() > now.getTime());
   const openTasks = snapshot.tasks.some((task) => !task.done);
   const homeEmpty = !openTasks && snapshot.shopping.length === 0;
+  const momenteLive = snapshot.spotlights.some((row) => {
+    const target = dateKey(zonedParts(new Date(row.startsAt)));
+    const current = dateKey(today);
+    return target >= current;
+  });
 
   return {
     today: { empty: !todayEvents, stale: false },
     week: { empty: !weekEvents, stale: false },
-    month: { empty: !monthEvents, stale: false },
+    momente: { empty: !momenteLive, stale: false },
     site: { empty: !hasPrefix(snapshot.metrics, "site."), stale: sourceIsStale(snapshot.metrics, "site.", now) },
     tiktok: { empty: !hasPrefix(snapshot.metrics, "tiktok."), stale: sourceIsStale(snapshot.metrics, "tiktok.", now) },
     vision: { empty: !cards, stale: false },
@@ -71,15 +73,6 @@ export function sourceIsStale(metrics: SnapshotMetric[], prefix: string, now: Da
 
 function hasPrefix(metrics: SnapshotMetric[], prefix: string): boolean {
   return metrics.some((metric) => metric.key.startsWith(prefix));
-}
-
-function monthKeysFor(today: DateParts): Set<string> {
-  const first = { year: today.year, month: today.month, day: 1 };
-  const weekday = mondayIndex(first);
-  const start = addDays(first, -weekday);
-  const keys = new Set<string>();
-  for (let index = 0; index < 42; index += 1) keys.add(dateKey(addDays(start, index)));
-  return keys;
 }
 
 export function mondayIndex(day: DateParts): number {

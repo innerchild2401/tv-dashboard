@@ -98,7 +98,7 @@ describe("calendar views", () => {
 
   it("renders every view from the sample snapshot", () => {
     const snapshot = sampleSnapshot(morning);
-    for (const viewId of ["today", "week", "month", "site", "tiktok", "vision", "home"] as const) {
+    for (const viewId of ["today", "week", "momente", "site", "tiktok", "vision", "home"] as const) {
       const state = buildTvState(snapshot, morning, viewId);
       assert.equal(state.currentView, viewId);
       assert.equal(state[viewId] === null, false);

@@ -17,7 +17,7 @@ describe("rotation", () => {
   const pool = [
     candidate("today", 3),
     candidate("week", 2),
-    candidate("month", 1),
+    candidate("momente", 1),
     candidate("site", 1),
     candidate("tiktok", 1),
     candidate("vision", 1),
@@ -55,7 +55,7 @@ describe("rotation", () => {
       counts.set(decision.viewId, (counts.get(decision.viewId) ?? 0) + 1);
       cursor = new Date(decision.until);
     }
-    assert.ok((counts.get("today") ?? 0) > (counts.get("month") ?? 0));
+    assert.ok((counts.get("today") ?? 0) > (counts.get("momente") ?? 0));
   });
 
   it("moves an empty Today onto Week and skips an empty Home", () => {
@@ -112,7 +112,7 @@ describe("rotation", () => {
   it("peeks a successor of the forced view, not a wall-clock re-resolve", () => {
     const now = zonedTimeToUtc({ year: 2026, month: 11, day: 8, hour: 14, minute: 10 });
     const until = new Date(now.getTime() + 45_000).toISOString();
-    for (const previous of ["month", "vision", "today", "week"] as ViewId[]) {
+    for (const previous of ["momente", "vision", "today", "week"] as ViewId[]) {
       const next = peekNextView(pool, previous, until);
       assert.notEqual(next, previous, `peek after ${previous}`);
     }
@@ -144,7 +144,7 @@ describe("state fallbacks", () => {
 
   it("keeps Azi and Săptămână in the forced ?view= Cast chain", () => {
     let now = zonedTimeToUtc({ year: 2026, month: 11, day: 8, hour: 14, minute: 10 });
-    let force: ViewId | null = "month";
+    let force: ViewId | null = "momente";
     const counts = new Map<string, number>();
     for (let step = 0; step < 36; step += 1) {
       const state = buildTvState(sampleSnapshot(now), now, force);

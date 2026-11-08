@@ -118,12 +118,60 @@
 
   var lastLabel = "";
   var lastAdvance = Date.now();
+  var lastDayKey = "";
+
+  function dayKey(date) {
+    try {
+      var parts = new Intl.DateTimeFormat("en-CA", {
+        timeZone: TIME_ZONE,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).formatToParts(date);
+      var year = "1970";
+      var month = "01";
+      var day = "01";
+      for (var i = 0; i < parts.length; i += 1) {
+        if (parts[i].type === "year") year = parts[i].value;
+        if (parts[i].type === "month") month = parts[i].value;
+        if (parts[i].type === "day") day = parts[i].value;
+      }
+      return year + "-" + month + "-" + day;
+    } catch (err) {
+      return date.getFullYear() + "-" + pad(date.getMonth() + 1) + "-" + pad(date.getDate());
+    }
+  }
+
+  /* Soft digit crossfade for Momente when React never mounts. */
+  function paintCountdowns() {
+    var nodes = document.querySelectorAll("[data-tv-countdown]");
+    for (var i = 0; i < nodes.length; i += 1) {
+      var expected = nodes[i].getAttribute("data-tv-countdown") || "";
+      if (nodes[i].textContent === expected) continue;
+      nodes[i].className = (nodes[i].className || "").replace(/\bis-tick\b/g, "").replace(/\s+/g, " ").trim() + " is-tick";
+      nodes[i].textContent = expected;
+      (function (el) {
+        window.setTimeout(function () {
+          el.className = (el.className || "").replace(/\bis-tick\b/g, "").replace(/\s+/g, " ").trim();
+        }, 180);
+      })(nodes[i]);
+    }
+  }
 
   function tick() {
     var now = Date.now();
     var label = paintClock();
     var node = root();
     paintDwell(node, now);
+    paintCountdowns();
+    var key = dayKey(new Date(now));
+    if (lastDayKey && key !== lastDayKey && node && node.getAttribute("data-view") === "momente") {
+      try {
+        window.location.reload();
+        return;
+      } catch (err) {}
+    }
+    lastDayKey = key;
     if (label !== lastLabel) {
       lastLabel = label;
       lastAdvance = now;

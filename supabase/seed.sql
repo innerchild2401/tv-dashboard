@@ -10,7 +10,7 @@ values (
   '[
     {"id":"today","enabled":true,"order":1,"dwellSeconds":45,"weight":3},
     {"id":"week","enabled":true,"order":2,"dwellSeconds":45,"weight":2},
-    {"id":"month","enabled":true,"order":3,"dwellSeconds":45,"weight":1},
+    {"id":"momente","enabled":true,"order":3,"dwellSeconds":45,"weight":1},
     {"id":"site","enabled":true,"order":4,"dwellSeconds":45,"weight":1},
     {"id":"tiktok","enabled":true,"order":5,"dwellSeconds":45,"weight":1},
     {"id":"vision","enabled":true,"order":6,"dwellSeconds":45,"weight":1},
@@ -18,7 +18,7 @@ values (
   ]'::jsonb,
   '[
     {"id":"morning","start":"06:00","end":"10:00","views":[{"id":"today","weight":3,"dwellSeconds":60},{"id":"week","weight":2,"dwellSeconds":45},{"id":"vision","weight":1,"dwellSeconds":45}]},
-    {"id":"daytime","start":"10:00","end":"18:00","views":[{"id":"today","weight":3,"dwellSeconds":45},{"id":"week","weight":2,"dwellSeconds":45},{"id":"month","weight":1,"dwellSeconds":45},{"id":"home","weight":1,"dwellSeconds":45},{"id":"vision","weight":1,"dwellSeconds":45}]},
+    {"id":"daytime","start":"10:00","end":"18:00","views":[{"id":"today","weight":3,"dwellSeconds":45},{"id":"week","weight":2,"dwellSeconds":45},{"id":"momente","weight":1,"dwellSeconds":45},{"id":"home","weight":1,"dwellSeconds":45},{"id":"vision","weight":1,"dwellSeconds":45}]},
     {"id":"evening","start":"18:00","end":"23:00","views":[{"id":"today","weight":2,"dwellSeconds":45},{"id":"vision","weight":2,"dwellSeconds":45},{"id":"site","weight":1,"dwellSeconds":45},{"id":"tiktok","weight":1,"dwellSeconds":45},{"id":"home","weight":1,"dwellSeconds":45}]}
   ]'::jsonb,
   '{"start":"23:00","end":"06:00"}'::jsonb,
@@ -340,3 +340,36 @@ select 'tiktok.views.7d', week_value, round(week_value * 0.88), now(), 'manual',
 from (
   select sum(value) as week_value from public.metrics where key like 'tiktok.views.day.%' and deleted_at is null
 ) as totals;
+
+-- Sample Momente so Cast is not empty. Clear with:
+--   delete from public.spotlights where external_id in ('spotlight-vacanta-sample', 'spotlight-deadline-sample');
+-- or agent tool delete_spotlight with those externalIds.
+insert into public.spotlights (id, title, kind, starts_at, note, pinned, source, locked, external_id)
+select
+  'a1111111-1111-4111-8111-111111111111',
+  'Vacanță la munte',
+  'trip',
+  bounds.day_start + interval '12 days' + interval '8 hours',
+  'Plecare dimineața',
+  true,
+  'assistant',
+  false,
+  'spotlight-vacanta-sample'
+from (
+  select (date_trunc('day', now() at time zone 'Europe/Bucharest') at time zone 'Europe/Bucharest') as day_start
+) as bounds;
+
+insert into public.spotlights (id, title, kind, starts_at, note, pinned, source, locked, external_id)
+select
+  'a2222222-2222-4222-8222-222222222222',
+  'Deadline proiect',
+  'deadline',
+  bounds.day_start + interval '3 days' + interval '18 hours',
+  null,
+  false,
+  'assistant',
+  false,
+  'spotlight-deadline-sample'
+from (
+  select (date_trunc('day', now() at time zone 'Europe/Bucharest') at time zone 'Europe/Bucharest') as day_start
+) as bounds;

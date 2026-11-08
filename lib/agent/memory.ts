@@ -16,6 +16,7 @@ import {
   type PriorityRecord,
   type RecapRecord,
   type ShoppingRecord,
+  type SpotlightRecord,
   type TaskRecord,
   type ToolResult,
   type UndoBody,
@@ -34,6 +35,7 @@ type Bag = {
   inbox: InboxRecord[];
   ideas: IdeaRecord[];
   metrics: MetricRecord[];
+  spotlights: SpotlightRecord[];
   control: DisplayControl;
 };
 
@@ -50,6 +52,7 @@ export class MemoryStore implements AgentStore {
     inbox: [],
     ideas: [],
     metrics: [],
+    spotlights: [],
     control: { ...ROTATE_CONTROL },
   };
 
@@ -112,6 +115,7 @@ export class MemoryStore implements AgentStore {
     for (const item of body.inbox ?? []) this.replace(this.bag.inbox, item);
     for (const idea of body.ideas ?? []) this.replace(this.bag.ideas, idea);
     for (const metric of body.metrics ?? []) this.replace(this.bag.metrics, metric);
+    for (const spotlight of body.spotlights ?? []) this.replace(this.bag.spotlights, spotlight);
     this.drop(this.bag.cards, body.drop?.cards, now);
     this.drop(this.bag.events, body.drop?.events, now);
     this.drop(this.bag.tasks, body.drop?.tasks, now);
@@ -121,6 +125,7 @@ export class MemoryStore implements AgentStore {
     this.drop(this.bag.inbox, body.drop?.inbox, now);
     this.drop(this.bag.ideas, body.drop?.ideas, now);
     this.drop(this.bag.metrics, body.drop?.metrics, now);
+    this.drop(this.bag.spotlights, body.drop?.spotlights, now);
     if (body.control) this.bag.control = copy(body.control);
   }
 
@@ -202,6 +207,14 @@ export class MemoryStore implements AgentStore {
 
   async putMetric(row: MetricRecord): Promise<void> {
     this.replace(this.bag.metrics, row);
+  }
+
+  async spotlights(): Promise<SpotlightRecord[]> {
+    return copy(this.bag.spotlights);
+  }
+
+  async putSpotlight(row: SpotlightRecord): Promise<void> {
+    this.replace(this.bag.spotlights, row);
   }
 
   async control(): Promise<DisplayControl> {

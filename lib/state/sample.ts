@@ -1,6 +1,7 @@
 import { sampleConfig } from "@/lib/seed/sample-config";
 import { sampleCards, sampleRecap, sampleShopping, sampleTasks } from "@/lib/seed/sample-board";
 import { sampleMetrics } from "@/lib/seed/sample-metrics";
+import { sampleSpotlights } from "@/lib/seed/sample-spotlights";
 import { sampleSchedule } from "@/lib/today/schedule";
 import { addDays, endOfZonedDay, zonedParts, zonedTimeToUtc } from "@/lib/time/bucharest";
 import { configSchema } from "@/lib/schemas";
@@ -28,6 +29,7 @@ export function sampleSnapshot(now: Date): Snapshot {
     })),
     shopping: sampleShopping,
     cards: sampleCards(now),
+    spotlights: sampleSpotlights(now),
     recap: {
       ...sampleRecap,
       expiresAt: endOfZonedDay(addDays(today, 1)).toISOString(),

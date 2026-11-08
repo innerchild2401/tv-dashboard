@@ -30,38 +30,53 @@ async function loadDatabaseSnapshot(now: Date): Promise<Snapshot> {
   const windowStart = zonedTimeToUtc({ ...addDays(parts, -45), hour: 0, minute: 0 }).toISOString();
   const windowEnd = zonedTimeToUtc({ ...addDays(parts, 45), hour: 23, minute: 59 }).toISOString();
 
-  const [configResult, eventsResult, tasksResult, shoppingResult, cardsResult, recapsResult, prioritiesResult, metricsResult, inboxResult] =
-    await Promise.all([
-      supabase.from("config").select("*").eq("id", 1).maybeSingle(),
-      supabase
-        .from("events")
-        .select("id, title, starts_at, ends_at, all_day, person_id")
-        .is("deleted_at", null)
-        .lte("starts_at", windowEnd)
-        .gte("ends_at", windowStart)
-        .order("starts_at"),
-      supabase.from("tasks").select("id, text, done, assignee_id, due_date").is("deleted_at", null),
-      supabase.from("shopping_items").select("id, text, qty, unit, category, checked").is("deleted_at", null),
-      supabase
-        .from("cards")
-        .select("id, view_id, kind, title, body, color, tilt, grid_col, grid_row, grid_col_span, grid_row_span, expires_at, pinned, source, locked, external_id, data")
-        .eq("view_id", "vision")
-        .is("deleted_at", null),
-      supabase
-        .from("recaps")
-        .select("id, text, highlights, expires_at, created_at")
-        .is("deleted_at", null)
-        .order("created_at", { ascending: false })
-        .limit(5),
-      supabase
-        .from("priorities")
-        .select("text, reason, due_at, expires_at, source, locked, updated_at")
-        .is("deleted_at", null)
-        .order("updated_at", { ascending: false })
-        .limit(10),
-      supabase.from("metrics").select("key, value, previous, fetched_at, source").is("deleted_at", null),
-      supabase.from("inbox_items").select("id").eq("status", "new").is("deleted_at", null),
-    ]);
+  const [
+    configResult,
+    eventsResult,
+    tasksResult,
+    shoppingResult,
+    cardsResult,
+    spotlightsResult,
+    recapsResult,
+    prioritiesResult,
+    metricsResult,
+    inboxResult,
+  ] = await Promise.all([
+    supabase.from("config").select("*").eq("id", 1).maybeSingle(),
+    supabase
+      .from("events")
+      .select("id, title, starts_at, ends_at, all_day, person_id")
+      .is("deleted_at", null)
+      .lte("starts_at", windowEnd)
+      .gte("ends_at", windowStart)
+      .order("starts_at"),
+    supabase.from("tasks").select("id, text, done, assignee_id, due_date").is("deleted_at", null),
+    supabase.from("shopping_items").select("id, text, qty, unit, category, checked").is("deleted_at", null),
+    supabase
+      .from("cards")
+      .select("id, view_id, kind, title, body, color, tilt, grid_col, grid_row, grid_col_span, grid_row_span, expires_at, pinned, source, locked, external_id, data")
+      .eq("view_id", "vision")
+      .is("deleted_at", null),
+    supabase
+      .from("spotlights")
+      .select("id, title, kind, starts_at, note, pinned")
+      .is("deleted_at", null)
+      .order("starts_at"),
+    supabase
+      .from("recaps")
+      .select("id, text, highlights, expires_at, created_at")
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(5),
+    supabase
+      .from("priorities")
+      .select("text, reason, due_at, expires_at, source, locked, updated_at")
+      .is("deleted_at", null)
+      .order("updated_at", { ascending: false })
+      .limit(10),
+    supabase.from("metrics").select("key, value, previous, fetched_at, source").is("deleted_at", null),
+    supabase.from("inbox_items").select("id").eq("status", "new").is("deleted_at", null),
+  ]);
 
   if (
     configResult.error ||
@@ -69,6 +84,7 @@ async function loadDatabaseSnapshot(now: Date): Promise<Snapshot> {
     tasksResult.error ||
     shoppingResult.error ||
     cardsResult.error ||
+    spotlightsResult.error ||
     recapsResult.error ||
     prioritiesResult.error ||
     metricsResult.error ||
@@ -171,6 +187,14 @@ async function loadDatabaseSnapshot(now: Date): Promise<Snapshot> {
       checked: row.checked,
     })),
     cards,
+    spotlights: (spotlightsResult.data ?? []).map((row) => ({
+      id: row.id,
+      title: row.title,
+      kind: row.kind,
+      startsAt: row.starts_at,
+      note: row.note,
+      pinned: row.pinned,
+    })),
     recap: recapRow
       ? {
           id: recapRow.id,

@@ -395,6 +395,7 @@
 
 .week-board,
 .month,
+.momente,
 .site,
 .tiktok,
 .vision,
@@ -588,6 +589,211 @@
   height: 6px;
   border-radius: 999px;
   background: var(--accent);
+}
+
+/* Momente: atmosphere by kind, count-based layout, Cast-readable type. */
+.momente {
+  --momente-ink: #f3efe6;
+  --momente-muted: rgba(243, 239, 230, 0.72);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 12px;
+  min-height: 0;
+  color: var(--momente-ink);
+}
+
+.momente-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.momente-head h2 {
+  margin: 0;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 28px;
+  letter-spacing: 0.02em;
+}
+
+.momente-overflow,
+.momente-empty,
+.momente-kind,
+.momente-note,
+.momente-unit {
+  margin: 0;
+  color: var(--momente-muted);
+}
+
+.momente-overflow {
+  font-size: 20px;
+}
+
+.momente-empty {
+  align-self: center;
+  justify-self: center;
+  font-size: 28px;
+}
+
+.momente-stage {
+  display: grid;
+  gap: 14px;
+  min-height: 0;
+  height: 100%;
+}
+
+.momente--1 .momente-stage {
+  grid-template-columns: 1fr;
+}
+
+.momente--2 .momente-stage {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.momente--3 .momente-stage {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.momente--4 .momente-stage {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+}
+
+.momente--dense .momente-stage,
+.momente--overflow .momente-stage {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.momente-spot {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+  min-height: 0;
+  padding: 22px 24px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background:
+    linear-gradient(165deg, rgba(8, 14, 22, 0.18), rgba(8, 14, 22, 0.55)),
+    radial-gradient(120% 90% at 12% 8%, var(--spot-glow), transparent 58%),
+    linear-gradient(145deg, var(--spot-from), var(--spot-to));
+  animation: momente-in 520ms ease both;
+  animation-delay: calc(var(--spot-i, 0) * 70ms);
+}
+
+.momente--1 .momente-spot {
+  padding: 36px 40px;
+  justify-content: center;
+}
+
+.momente-spot.kind-trip {
+  --spot-from: #0f3d4a;
+  --spot-to: #1d6b5c;
+  --spot-glow: rgba(110, 214, 188, 0.45);
+}
+
+.momente-spot.kind-competition {
+  --spot-from: #4a2f12;
+  --spot-to: #9a5b1f;
+  --spot-glow: rgba(255, 186, 107, 0.42);
+}
+
+.momente-spot.kind-deadline {
+  --spot-from: #4a1d22;
+  --spot-to: #8f3a2f;
+  --spot-glow: rgba(255, 138, 122, 0.4);
+}
+
+.momente-spot.kind-other {
+  --spot-from: #1c2733;
+  --spot-to: #334155;
+  --spot-glow: rgba(148, 176, 196, 0.35);
+}
+
+.momente-spot.is-today {
+  box-shadow: inset 0 0 0 2px rgba(243, 239, 230, 0.55);
+}
+
+.momente-kind {
+  font-size: 18px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.momente-spot h3 {
+  margin: 0;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 36px;
+  line-height: 1.05;
+  font-weight: 600;
+}
+
+.momente--1 .momente-spot h3 {
+  font-size: 56px;
+  max-width: 14ch;
+}
+
+.momente--dense .momente-spot h3,
+.momente--overflow .momente-spot h3 {
+  font-size: 26px;
+}
+
+.momente-count {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.momente-digits {
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 72px;
+  line-height: 0.9;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  transition: opacity 180ms ease;
+}
+
+.momente-digits.is-tick {
+  opacity: 0.35;
+}
+
+.momente--1 .momente-digits {
+  font-size: 128px;
+}
+
+.momente--dense .momente-digits,
+.momente--overflow .momente-digits {
+  font-size: 48px;
+}
+
+.momente-unit {
+  font-size: 24px;
+}
+
+.momente-note {
+  font-size: 20px;
+  max-width: 28ch;
+}
+
+.momente--dense .momente-note,
+.momente--overflow .momente-note {
+  display: none;
+}
+
+@keyframes momente-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .site,

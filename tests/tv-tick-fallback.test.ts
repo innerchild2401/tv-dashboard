@@ -28,4 +28,10 @@ describe("tv-tick Cast fallback", () => {
     assert.match(source, /--tv-scale/);
     assert.match(source, /applyFit/);
   });
+
+  it("soft-ticks Momente countdown digits without React", () => {
+    assert.match(source, /data-tv-countdown/);
+    assert.match(source, /paintCountdowns/);
+    assert.match(source, /is-tick/);
+  });
 });

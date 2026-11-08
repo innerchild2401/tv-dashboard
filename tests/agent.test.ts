@@ -228,6 +228,8 @@ describe("agent transport", () => {
     const payload = JSON.parse(await mcpJson(listed)) as { result?: { tools?: { name: string }[] }; error?: { message?: string } };
     const names = payload.result?.tools?.map((tool) => tool.name) ?? [];
     assert.ok(names.includes("upsert_card"), payload.error?.message ?? JSON.stringify(payload));
+    assert.ok(names.includes("upsert_spotlight"), payload.error?.message ?? JSON.stringify(payload));
+    assert.ok(names.includes("delete_spotlight"));
     assert.ok(names.includes("route_inbox_item"));
     assert.ok(names.includes("undo"));
     assert.equal(names.includes("resources/list"), false);
