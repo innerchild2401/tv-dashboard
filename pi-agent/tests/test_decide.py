@@ -105,6 +105,18 @@ class WatchdogTest(unittest.TestCase):
         tick(Memory(), 0, wrong, [], casts, [])
         self.assertEqual(casts, [0])
 
+    def test_dashboard_refresh_re_casts_when_configured(self):
+        showing = Sight(looked=True, found=True, app_id=DASH_APP_ID, app_name="DashCast", dash_url=URL)
+        memory = Memory()
+        memory.last_cast_mono = 0
+        casts = []
+        settings = Settings(dashboard_refresh_seconds=1800)
+        for now in range(0, 1800, 15):
+            tick(memory, now, showing, [], casts, [], settings=settings)
+        self.assertEqual(casts, [])
+        tick(memory, 1800, showing, [], casts, [], settings=settings)
+        self.assertEqual(casts, [1800])
+
     def test_cast_now_overrides_netflix_and_release_blocks_the_automatic_cast(self):
         netflix = Sight(looked=True, found=True, app_id="CA5E8412", app_name="Netflix")
         casts = []
@@ -168,7 +180,9 @@ class WatchdogTest(unittest.TestCase):
         example = (ROOT / "tv-agent.toml.example").read_text(encoding="utf-8")
         config = parse_config(example)
         self.assertEqual(config.server_url, "https://tv-dashboard-sigma-one.vercel.app")
-        self.assertEqual(config.settings(), Settings())
+        self.assertEqual(config.dashcast_force, False)
+        self.assertEqual(config.dashcast_reload_seconds, 1800)
+        self.assertEqual(config.settings(), Settings(dashboard_refresh_seconds=0))
         self.assertEqual(config.problems(), ["pi_token", "tv_token", "chromecast"])
         filled = example.replace('pi_token = ""', 'pi_token = "pi-value"', 1)
         filled = filled.replace('tv_token = ""', 'tv_token = "tv-value"', 1)
@@ -177,6 +191,9 @@ class WatchdogTest(unittest.TestCase):
         self.assertEqual(ready.problems(), [])
         self.assertIn("/tv?token=", ready.tv_url())
         self.assertNotIn("pi-value", " ".join(ready.problems()))
+        forced = parse_config(filled + "\ndashcast_force = true\n")
+        self.assertTrue(forced.dashcast_force)
+        self.assertEqual(forced.settings().dashboard_refresh_seconds, 1800)
 
 
 if __name__ == "__main__":

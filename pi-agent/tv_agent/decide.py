@@ -16,6 +16,7 @@ class Settings:
     idle_seconds: int = 60
     heartbeat_seconds: int = 60
     backoff_cap_seconds: int = 300
+    dashboard_refresh_seconds: int = 0
 
 
 @dataclass
@@ -44,6 +45,7 @@ class Memory:
     hands_off_until: float = 0.0
     last_cast_url: str | None = None
     last_cast_at: str | None = None
+    last_cast_mono: float = -1_000_000_000.0
     receiver: str = "unknown"
     app_name: str | None = None
     app_id: str | None = None
@@ -145,6 +147,16 @@ def plan(
         auto = memory.idle_for >= settings.idle_seconds and now >= memory.hands_off_until and now >= memory.backoff_until
     elif receiver == "dashboard_wrong":
         auto = now >= memory.hands_off_until and now >= memory.backoff_until
+    elif receiver == "dashboard" and settings.dashboard_refresh_seconds > 0:
+        if memory.last_cast_mono < 0:
+            memory.last_cast_mono = now
+        elif (
+            now >= memory.hands_off_until
+            and now >= memory.backoff_until
+            and now - memory.last_cast_mono >= settings.dashboard_refresh_seconds
+        ):
+            auto = True
+            notes.append("refresh")
     return Step(
         receiver=receiver,
         cast=(forced and sight.found) or auto,

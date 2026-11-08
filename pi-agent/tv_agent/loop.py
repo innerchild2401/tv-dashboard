@@ -53,8 +53,9 @@ def run_once(step_input: LoopInput) -> None:
         else:
             memory.last_cast_url = step_input.expected_url
             memory.last_cast_at = step_input.wall_iso
+            memory.last_cast_mono = step_input.now
             note_success(memory)
-            remember(memory, "cast ok")
+            remember(memory, "cast ok" if "refresh" not in decided.notes else "cast refresh")
     elif sight.looked and sight.found:
         note_success(memory)
         if decided.receiver == "other":

@@ -35,7 +35,13 @@ def load(config: Config) -> None:
         if cast is None:
             raise RuntimeError("chromecast not found")
         cast.wait(timeout=config.discovery_timeout_seconds)
-        _load_url(cast, config.tv_url(), float(config.discovery_timeout_seconds))
+        _load_url(
+            cast,
+            config.tv_url(),
+            float(config.discovery_timeout_seconds),
+            config.dashcast_force,
+            config.dashcast_reload_seconds,
+        )
     finally:
         _close(cast, browser)
 
@@ -79,7 +85,7 @@ def _capture(holder: dict[str, str | None]):
     return CapturingDash()
 
 
-def _load_url(cast, url: str, timeout: float) -> None:
+def _load_url(cast, url: str, timeout: float, force: bool, reload_seconds: int) -> None:
     from pychromecast.controllers.dashcast import DashCastController
 
     controller = DashCastController()
@@ -91,7 +97,10 @@ def _load_url(cast, url: str, timeout: float) -> None:
         failed["value"] = not msg_sent
         done.set()
 
-    controller.load_url(url, force=True, callback_function=callback)
+    # DashCast ignores reload_seconds when force=True (see pychromecast DashCastController).
+    # Prefer force=False + reload_seconds so a frozen page recovers without the Pi re-casting.
+    reload = 0 if force else max(0, reload_seconds)
+    controller.load_url(url, force=force, reload_seconds=reload, callback_function=callback)
     if not done.wait(timeout):
         raise TimeoutError("dashcast")
     if failed["value"]:
