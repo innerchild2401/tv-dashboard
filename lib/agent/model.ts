@@ -177,6 +177,16 @@ export type AuditRow = {
   createdAt: string;
 };
 
+export type AuditSummary = {
+  id: string;
+  tool: string;
+  createdAt: string;
+  ok: boolean;
+  reason: string | null;
+  undone: boolean;
+  canUndo: boolean;
+};
+
 export type ViewRow = { id: string; enabled: boolean; order: number; dwellSeconds: number; weight: number };
 export type PersonRow = { id: string; name: string };
 
@@ -184,6 +194,7 @@ export interface AgentStore {
   countRecent(now: Date): Promise<number>;
   audit(entry: { tool: string; argsHash: string; result: ToolResult; undo: UndoBody | null; now: Date }): Promise<void>;
   recentUndoable(): Promise<AuditRow[]>;
+  recentAudits(limit: number): Promise<AuditSummary[]>;
   markUndone(id: string, now: Date): Promise<void>;
   applyUndo(body: UndoBody, now: Date): Promise<void>;
   views(): Promise<ViewRow[]>;

@@ -6,6 +6,7 @@ import {
   copy,
   type AgentStore,
   type AuditRow,
+  type AuditSummary,
   type CardRecord,
   type EventRecord,
   type IdeaRecord,
@@ -75,6 +76,25 @@ export class MemoryStore implements AgentStore {
       .slice(-50)
       .reverse()
       .map((row) => copy(row));
+  }
+
+  async recentAudits(limit: number): Promise<AuditSummary[]> {
+    return this.bag.audits
+      .slice(-Math.max(0, limit))
+      .reverse()
+      .map((row) => {
+        const result = this.bag.auditResults.get(row.id);
+        const ok = result?.ok === true;
+        return {
+          id: row.id,
+          tool: row.tool,
+          createdAt: row.createdAt,
+          ok,
+          reason: result?.reason ?? null,
+          undone: Boolean(row.undoneAt),
+          canUndo: ok && row.tool !== "undo" && row.undo !== null && !row.undoneAt,
+        };
+      });
   }
 
   async markUndone(id: string, now: Date): Promise<void> {

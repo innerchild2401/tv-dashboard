@@ -30,7 +30,7 @@ pnpm dev
 
 Open [http://127.0.0.1:3000/tv](http://127.0.0.1:3000/tv). In development, with `TV_TOKEN` empty, the page shows the sample Today view. A production process refuses `/tv` until `TV_TOKEN` is set, then the page expects `?token=` to match it.
 
-The phone remote is [http://127.0.0.1:3000/remote](http://127.0.0.1:3000/remote). It asks for `REMOTE_PIN` (4 to 6 digits), locks for 15 minutes after 5 wrong tries, and keeps a signed session for 30 days. From there you can pause, pin or lock a view, dim the TV, edit the layout, change vision-board cards (including a photo), check tasks and shopping, and capture an inbox note. A saved change broadcasts a content-free Realtime ping; the TV refetches, and it also polls every 30 seconds. Quiet hours, interrupts and time-of-day profiles can be edited and are stored. They are not applied to rotation yet.
+The phone remote is [http://127.0.0.1:3000/remote](http://127.0.0.1:3000/remote). It asks for `REMOTE_PIN` (4 to 6 digits), locks for 15 minutes after 5 wrong tries, and keeps a signed session for 30 days. From there you can pause, pin or lock a view, dim the TV, edit the layout, change vision-board cards (including a photo), check tasks and shopping, capture an inbox note, and open `/remote/system` for the Pi and the assistant log. A saved change broadcasts a content-free Realtime ping; the TV refetches, and it also polls every 30 seconds. Quiet hours, interrupts and time-of-day profiles can be edited and are stored. They are not applied to rotation yet.
 
 ```bash
 pnpm test
@@ -54,7 +54,56 @@ The Vercel project is `tv-dashboard`, framework Next.js, function region `fra1`,
 
 Wins-card evidence is enforced with a trigger. Postgres does not allow a subquery inside a check constraint.
 
-Calendar and weather refresh from `/api/cron/calendar` (every 5 minutes) and `/api/cron/weather` (every 30 minutes). Supabase `pg_cron` and `pg_net` call those routes. The routes skip a call that arrives before the interval, so they need no secret. A read that finds stale data refreshes it as well. The Pi agent is generated later, because this environment cannot reach the Pi.
+Calendar and weather refresh from `/api/cron/calendar` (every 5 minutes) and `/api/cron/weather` (every 30 minutes). Supabase `pg_cron` and `pg_net` call those routes. The routes skip a call that arrives before the interval, so they need no secret. A read that finds stale data refreshes it as well.
+
+The Pi watchdog is `pi-agent/`. The steps to copy it onto the Raspberry Pi are below. This environment cannot reach the Pi.
+
+## Raspberry Pi watchdog
+
+The Pi only keeps the Chromecast on the dashboard. It does not render the page. The service loops every 15 seconds: an idle or backdrop Chromecast is cast after 60 seconds, DashCast already showing this dashboard is left alone, and any other app (Netflix, YouTube, a phone cast) is left alone. A failed discovery or cast waits, doubling up to 5 minutes, and the process keeps running. Every 60 seconds it posts a heartbeat. The phone page `/remote/system` shows that heartbeat, the Chromecast state, the last cast, and a log tail. Re-cast, restart, and hands-off queue a command the Pi picks up. If no heartbeat arrives for 5 minutes, the page shows an alert.
+
+Use Raspberry Pi OS Lite. The Zero W only has 2.4 GHz Wi-Fi. The Pi and the Chromecast have to be on the same network; guest or isolated Wi-Fi usually blocks discovery. `PI_TOKEN` is already set on Vercel Production and Preview. `TV_TOKEN` is the same value the TV URL uses. Copy both from a place you already store them. Do not commit them and do not paste them into chat.
+
+On your computer, from a checkout of this repo, copy the agent to the Pi. Replace the host if yours is different:
+
+```bash
+scp -r pi-agent pi@raspberrypi.local:/tmp/tv-agent
+```
+
+On the Pi:
+
+```bash
+ssh pi@raspberrypi.local
+sudo /tmp/tv-agent/install.sh
+sudo editor /etc/tv-agent.toml
+sudo systemctl enable --now tv-agent
+systemctl status tv-agent
+journalctl -u tv-agent -n 50 --no-pager
+```
+
+`install.sh` installs Python 3.11 or newer, Avahi, a virtualenv, and the `tv-agent` systemd unit, turns on NTP, and caps the journal at 50 MB. It will not start the service until `pi_token` in `/etc/tv-agent.toml` is non-empty. Set these keys:
+
+```toml
+server_url = "https://tv-dashboard-sigma-one.vercel.app"
+pi_token = "the PI_TOKEN value"
+tv_token = "the TV_TOKEN value"
+chromecast_name = "the name from the Google Home app"
+chromecast_ip = "192.168.1.50"
+```
+
+`chromecast_ip` is optional and is used when mDNS cannot see the Chromecast. The file must stay `root:tv-agent` and mode `640`. After a later edit:
+
+```bash
+sudo systemctl restart tv-agent
+```
+
+Then open `https://tv-dashboard-sigma-one.vercel.app/remote/system` on the phone. A heartbeat means the Pi is calling home. The alert means it has not.
+
+The decision loop can be checked on any computer, without a Pi or a Chromecast:
+
+```bash
+python3 -m unittest discover -s pi-agent/tests -v
+```
 
 ## Daily routine contract
 
@@ -62,7 +111,7 @@ Grokbot calls the MCP server at `/mcp` (stateless Streamable HTTP, tools only). 
 
 A run calls `get_dashboard_state`, then `get_inbox` and `route_inbox_item` for anything still waiting, then `set_recap`, then `set_priority`, then `upsert_card` for the affirmation, weekly wins and word of the month, then `upsert_events`, `upsert_task` and `shopping_add`. Use stable ids such as `recap-2026-11-08`, `affirmation-2026-11-08`, `wins-2026-11-08` and `word-2026-11-08`. The same id updates the existing row, so the routine can run twice.
 
-A manual or locked row is left unchanged. A priority needs a one-line reason and expires at the end of the day in Europe/Bucharest unless another time is sent. A manual priority wins. `route_inbox_item` creates an event only when the text has a date and a time; otherwise it creates a task, or leaves the item as needs review when the destination is unclear. A win or progress card needs `evidence` such as `task:done:<id>`. Every call is written to `audit_log`. `undo` restores one of the last 50 assistant writes, and it refuses when a later manual edit is holding that row. The phone's system page, where those undos will also appear, is not part of this milestone. Sixty calls per minute are counted in Postgres.
+A manual or locked row is left unchanged. A priority needs a one-line reason and expires at the end of the day in Europe/Bucharest unless another time is sent. A manual priority wins. `route_inbox_item` creates an event only when the text has a date and a time; otherwise it creates a task, or leaves the item as needs review when the destination is unclear. A win or progress card needs `evidence` such as `task:done:<id>`. Every call is written to `audit_log`. `undo` restores one of the last 50 assistant writes, and it refuses when a later manual edit is holding that row. `/remote/system` lists those writes and can undo one. Sixty calls per minute are counted in Postgres.
 
 ## Later
 

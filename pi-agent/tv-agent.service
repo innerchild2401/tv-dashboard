@@ -1,0 +1,18 @@
+[Unit]
+Description=TV dashboard Chromecast watchdog
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=tv-agent
+Group=tv-agent
+WorkingDirectory=/opt/tv-dashboard-agent
+ExecStart=/opt/tv-dashboard-agent/.venv/bin/python -m tv_agent
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

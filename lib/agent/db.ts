@@ -9,6 +9,7 @@ import {
   copy,
   type AgentStore,
   type AuditRow,
+  type AuditSummary,
   type CardRecord,
   type EventRecord,
   type IdeaRecord,
@@ -66,6 +67,29 @@ export class SupabaseStore implements AgentStore {
       undoneAt: undoneAt(row.result),
       createdAt: row.created_at,
     }));
+  }
+
+  async recentAudits(limit: number): Promise<AuditSummary[]> {
+    const { data, error } = await this.db
+      .from("audit_log")
+      .select("id, tool, undo, result, created_at")
+      .order("created_at", { ascending: false })
+      .limit(Math.max(0, limit));
+    if (error || !data) throw new Error("db");
+    return data.map((row) => {
+      const result = asObject(row.result);
+      const ok = result.ok === true;
+      const undone = undoneAt(row.result);
+      return {
+        id: row.id,
+        tool: row.tool,
+        createdAt: row.created_at,
+        ok,
+        reason: typeof result.reason === "string" ? result.reason : null,
+        undone: Boolean(undone),
+        canUndo: ok && row.tool !== "undo" && row.undo != null && !undone,
+      };
+    });
   }
 
   async markUndone(id: string, now: Date): Promise<void> {

@@ -1,0 +1,17 @@
+# /etc/tv-agent.toml
+# The install script copies this file once. Fill the empty values on the Pi.
+# Do not commit the filled file. Tokens come from `pnpm gen:secrets`.
+
+server_url = "https://tv-dashboard-sigma-one.vercel.app"
+pi_token = ""
+tv_token = ""
+
+# Friendly name from the Google Home app. IP is the fallback when mDNS is blocked.
+chromecast_name = ""
+chromecast_ip = ""
+
+loop_seconds = 15
+idle_seconds = 60
+heartbeat_seconds = 60
+backoff_cap_seconds = 300
+discovery_timeout_seconds = 5

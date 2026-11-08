@@ -204,6 +204,7 @@ export function RemoteProvider({ initial, children }: { initial: RemoteBoard | n
           <a href="/remote/cards">{ro.remote.cards}</a>
           <a href="/remote/lists">{ro.remote.lists}</a>
           <a href="/remote/inbox">{ro.remote.inbox}</a>
+          <a href="/remote/system">{ro.remote.navSystem}</a>
         </nav>
       </div>
     </RemoteContext.Provider>

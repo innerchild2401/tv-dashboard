@@ -173,6 +173,90 @@ export type Database = {
         }
         Relationships: []
       }
+      pi_commands: {
+        Row: {
+          created_at: string
+          delivered_at: string | null
+          id: string
+          kind: string
+          minutes: number | null
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          delivered_at?: string | null
+          id?: string
+          kind: string
+          minutes?: number | null
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          delivered_at?: string | null
+          id?: string
+          kind?: string
+          minutes?: number | null
+          status?: string
+        }
+        Relationships: []
+      }
+      pi_log: {
+        Row: {
+          created_at: string
+          id: string
+          line: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          line: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          line?: string
+        }
+        Relationships: []
+      }
+      pi_status: {
+        Row: {
+          agent_version: string | null
+          app_id: string | null
+          app_name: string | null
+          heartbeat_at: string | null
+          id: number
+          last_cast_at: string | null
+          local_ip: string | null
+          receiver: string
+          updated_at: string
+          uptime_seconds: number | null
+        }
+        Insert: {
+          agent_version?: string | null
+          app_id?: string | null
+          app_name?: string | null
+          heartbeat_at?: string | null
+          id?: number
+          last_cast_at?: string | null
+          local_ip?: string | null
+          receiver?: string
+          updated_at?: string
+          uptime_seconds?: number | null
+        }
+        Update: {
+          agent_version?: string | null
+          app_id?: string | null
+          app_name?: string | null
+          heartbeat_at?: string | null
+          id?: number
+          last_cast_at?: string | null
+          local_ip?: string | null
+          receiver?: string
+          updated_at?: string
+          uptime_seconds?: number | null
+        }
+        Relationships: []
+      }
       pin_guard: {
         Row: {
           failures: number

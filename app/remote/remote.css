@@ -32,7 +32,7 @@
 }
 
 .remote-body {
-  padding: 8px 16px 112px;
+  padding: 8px 16px 160px;
 }
 
 .remote-nav {
@@ -63,7 +63,7 @@
   padding: 8px 2px;
   border-radius: 12px;
   color: var(--text);
-  font-size: 13px;
+  font-size: 12px;
   text-decoration: none;
   text-align: center;
 }
@@ -273,6 +273,31 @@ fieldset {
   max-height: 220px;
   object-fit: cover;
   border-radius: 12px;
+}
+
+.alert-banner {
+  margin: 0;
+  padding: 12px;
+  border-radius: 12px;
+  background: #3a1d22;
+  color: #ffb4b4;
+}
+
+.remote[data-theme="light"] .alert-banner {
+  background: #ffd7d7;
+  color: #6b1d1d;
+}
+
+.log-tail {
+  max-height: 240px;
+  overflow: auto;
+  margin: 0;
+  padding: 12px;
+  border-radius: 12px;
+  background: #0d1117;
+  color: #d7dde3;
+  font: 13px/1.4 ui-monospace, monospace;
+  white-space: pre-wrap;
 }
 
 .dot {
