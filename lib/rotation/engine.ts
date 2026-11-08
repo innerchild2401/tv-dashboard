@@ -103,3 +103,15 @@ export function resolveRotation(now: Date, prepared: RotationCandidate[]): Rotat
     slot: 0,
   };
 }
+
+/** View that should paint when the current dwell ends (Cast SSR / classic fallback). */
+export function peekNextView(prepared: RotationCandidate[], previous: ViewId, untilIso: string): ViewId {
+  if (prepared.length === 0) return previous;
+  const atBoundary = new Date(untilIso);
+  if (!Number.isFinite(atBoundary.getTime())) {
+    return weightedPick(prepared, slotSeed(dateKey(zonedParts(new Date())), 0), previous).id;
+  }
+  const decision = resolveRotation(atBoundary, prepared);
+  if (decision.viewId !== previous || prepared.length === 1) return decision.viewId;
+  return weightedPick(prepared, slotSeed(dateKey(zonedParts(atBoundary)), decision.slot + 1), previous).id;
+}

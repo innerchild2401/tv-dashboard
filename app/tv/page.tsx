@@ -31,7 +31,8 @@ export default async function TvPage({
   }
 
   const now = new Date();
-  const preview = process.env.NODE_ENV === "production" ? null : parseViewId(readParam(params.view));
+  // Honor ?view= in production too: classic Cast falls back to SSR navigation with the next view.
+  const preview = parseViewId(readParam(params.view));
   let snapshot;
   try {
     snapshot = await loadSnapshot(now);

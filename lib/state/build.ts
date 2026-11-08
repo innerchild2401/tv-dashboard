@@ -1,6 +1,7 @@
 import { ro, type ViewId } from "@/i18n/ro";
 import { activeHold, ROTATE_CONTROL, type DisplayControl } from "@/lib/remote/hold";
 import { accentColor } from "@/lib/theme/accent";
+import { peekNextView, prepareCandidates } from "@/lib/rotation/engine";
 import { activePriority, evaluateRules } from "@/lib/rotation/rules";
 import { viewCandidates } from "@/lib/state/availability";
 import { projectWeek, projectMonth } from "@/lib/views/calendar";
@@ -52,6 +53,7 @@ export function buildTvState(
     reason = ro.lockedView;
     quiet = false;
   }
+  const nextView = resolveNextView(snapshot, current, until);
   const priority = activePriority(snapshot.priorities, now);
   const visible = quiet ? null : current;
   const calendarNote = updatedLabel(snapshot.calendarFetchedAt, now, CALENDAR_INTERVAL_MS);
@@ -81,6 +83,7 @@ export function buildTvState(
     ok: true,
     generatedAt: now.toISOString(),
     currentView: current,
+    nextView,
     until,
     reason,
     dwellRemaining: Math.max(0, Math.round((new Date(until).getTime() - now.getTime()) / 1000)),
@@ -116,6 +119,25 @@ export function buildTvState(
     vision: visible === "vision" ? projectVision(snapshot, now, celebrationText(smart.celebrations, "vision")) : null,
     home: visible === "home" ? projectHome(snapshot, now) : null,
   };
+}
+
+function resolveNextView(snapshot: Snapshot, current: ViewId, untilIso: string): ViewId {
+  const atUntil = new Date(untilIso);
+  if (!Number.isFinite(atUntil.getTime())) return current;
+  const configured = viewCandidates(snapshot, atUntil);
+  const later = evaluateRules({
+    now: atUntil,
+    config: snapshot.config,
+    events: snapshot.events,
+    priorities: snapshot.priorities,
+    metrics: snapshot.metrics,
+    forecast: snapshot.weather.hours ?? [],
+    candidates: configured,
+  });
+  if (later.viewId !== current) return later.viewId;
+  const prepared = prepareCandidates(configured, snapshot.config.rules.skipEmpty);
+  const pool = prepared.length > 0 ? prepared : configured.filter((view) => view.weight > 0);
+  return peekNextView(pool.length > 0 ? pool : configured, current, untilIso);
 }
 
 function todayBody(today: ReturnType<typeof projectTodayFromEvents>): Omit<TodayModel, "updatedLabel"> {
