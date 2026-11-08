@@ -4,11 +4,48 @@ import { personChip } from "@/lib/people";
 import type { HomeModel, Snapshot, SnapshotCard, VisionModel } from "@/lib/state/types";
 import { dateKey, zonedParts } from "@/lib/time/bucharest";
 
-export function projectVision(snapshot: Snapshot, now: Date): VisionModel {
+export function projectVision(snapshot: Snapshot, now: Date, celebration?: string | null): VisionModel {
   const cards = snapshot.cards
     .filter((card) => !card.expiresAt || new Date(card.expiresAt).getTime() > now.getTime())
     .map((card) => toCard(card, snapshot, now));
-  return { cards };
+  if (celebration) {
+    const spot = freeCell(cards);
+    cards.push({
+      id: "celebration",
+      kind: "note",
+      color: "sand",
+      tilt: -2,
+      col: spot.col,
+      row: spot.row,
+      colSpan: 1,
+      rowSpan: 1,
+      title: ro.celebrationDay,
+      body: celebration,
+      word: null,
+      countdownValue: null,
+      countdownUnit: null,
+      progress: null,
+      wins: [],
+      highlights: [],
+      photoUrl: null,
+    });
+  }
+  return { cards, celebration: celebration ?? null };
+}
+
+function freeCell(cards: VisionModel["cards"]): { col: number; row: number } {
+  const used = new Set<string>();
+  for (const card of cards) {
+    for (let row = card.row; row < card.row + card.rowSpan && row < 3; row += 1) {
+      for (let col = card.col; col < card.col + card.colSpan && col < 4; col += 1) used.add(`${col}:${row}`);
+    }
+  }
+  for (let row = 0; row < 3; row += 1) {
+    for (let col = 0; col < 4; col += 1) {
+      if (!used.has(`${col}:${row}`)) return { col, row };
+    }
+  }
+  return { col: 3, row: 2 };
 }
 
 export function projectHome(snapshot: Snapshot, now: Date): HomeModel {

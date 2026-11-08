@@ -7,7 +7,13 @@ export function TikTokView({ view }: { view: TikTokModel }) {
   const max = Math.max(...values);
   const span = Math.max(max - min, 1);
   return (
-    <section className="tiktok" aria-label={ro.views.tiktok}>
+    <section className={view.celebration ? "tiktok has-celebration" : "tiktok"} aria-label={ro.views.tiktok}>
+      {view.celebration ? (
+        <article className="celebrate">
+          <p className="kicker">{ro.remote.ruleCelebration}</p>
+          <h2>{view.celebration}</h2>
+        </article>
+      ) : null}
       <article className="stat hero-stat">
         <p>{view.followers.label}</p>
         <strong>{view.followers.value}</strong>

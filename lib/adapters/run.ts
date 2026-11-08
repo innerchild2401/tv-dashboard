@@ -1,6 +1,9 @@
+import { analyticsAdapter, fetchAnalytics, reportToMetrics } from "@/lib/adapters/analytics";
+import { storeMetrics } from "@/lib/adapters/metrics-write";
 import { calendarUrlFromEnv, fetchText, outcomeFromFeed, type FeedOutcome } from "@/lib/adapters/policy";
-import { CALENDAR_INTERVAL_MS, shouldRefresh, WEATHER_INTERVAL_MS } from "@/lib/adapters/intervals";
-import { DEFAULT_LOCATION, openMeteoUrl, parseOpenMeteo } from "@/lib/adapters/weather";
+import { ANALYTICS_INTERVAL_MS, CALENDAR_INTERVAL_MS, shouldRefresh, TIKTOK_INTERVAL_MS, WEATHER_INTERVAL_MS } from "@/lib/adapters/intervals";
+import { fetchTikTok, tiktokToMetrics, zernioConfigured } from "@/lib/adapters/tiktok";
+import { DEFAULT_LOCATION, openMeteoUrl, parseForecast, parseOpenMeteo, type ForecastHour } from "@/lib/adapters/weather";
 import { createServiceClient } from "@/lib/db/server";
 import { configSchema } from "@/lib/schemas";
 import type { Json } from "@/lib/db/database.types";
@@ -23,6 +26,8 @@ export async function refreshDueIntegrations(now = new Date()): Promise<void> {
   await Promise.all([
     refreshCalendars(now, supabase).catch(() => undefined),
     refreshWeather(now, supabase).catch(() => undefined),
+    refreshAnalytics(now, supabase).catch(() => undefined),
+    refreshTikTok(now, supabase).catch(() => undefined),
   ]);
 }
 
@@ -60,7 +65,7 @@ export async function refreshWeather(
     etag: null,
     attempted_at: now.toISOString(),
     fetched_at: now.toISOString(),
-    payload: { tempC: parsed.tempC, label: parsed.label, code: parsed.code },
+    payload: { tempC: parsed.tempC, label: parsed.label, code: parsed.code, hours: parseForecast(body) },
     ok: true,
   });
   return { status: saved ? "updated" : "failed" };
@@ -71,14 +76,72 @@ export async function readWeather(supabase: Client, location: string): Promise<{
   tempC: number | null;
   label: string | null;
   fetchedAt: string | null;
+  hours: ForecastHour[];
 }> {
   const row = await readCache(supabase, "weather");
   if (!row || row === "unavailable" || !row.ok || !row.fetched_at) {
-    return { location, tempC: null, label: null, fetchedAt: null };
+    return { location, tempC: null, label: null, fetchedAt: null, hours: [] };
   }
   const payload = weatherPayload(row.payload);
-  if (!payload) return { location, tempC: null, label: null, fetchedAt: null };
-  return { location, tempC: payload.tempC, label: payload.label, fetchedAt: row.fetched_at };
+  if (!payload) return { location, tempC: null, label: null, fetchedAt: null, hours: [] };
+  return { location, tempC: payload.tempC, label: payload.label, fetchedAt: row.fetched_at, hours: payload.hours };
+}
+
+export async function readTikTokTitle(supabase: Client): Promise<string | null> {
+  const row = await readCache(supabase, "tiktok");
+  if (!row || row === "unavailable" || !row.ok) return null;
+  if (!row.payload || typeof row.payload !== "object" || Array.isArray(row.payload)) return null;
+  const title = row.payload.videoTitle;
+  return typeof title === "string" && title.trim() ? title : null;
+}
+
+export async function refreshAnalytics(
+  now = new Date(),
+  supabase = createServiceClient(),
+): Promise<{ status: "unconfigured" | "skipped" | "updated" | "failed" | "unavailable" }> {
+  if (!analyticsAdapter()) return { status: "unconfigured" };
+  const row = await readCache(supabase, "analytics");
+  if (row === "unavailable") return { status: "unavailable" };
+  if (row && !shouldRefresh(row.attempted_at, now, ANALYTICS_INTERVAL_MS)) return { status: "skipped" };
+  if (!(await claim(supabase, "analytics", now))) return { status: "unavailable" };
+  const outcome = await fetchAnalytics(process.env, fetch, now);
+  if (outcome.status !== "updated") return { status: "failed" };
+  const stored = await storeMetrics(supabase, reportToMetrics(outcome.report, now), now, ["site.day.", "site.page.", "site.source."]);
+  if (!stored) return { status: "failed" };
+  const saved = await writeCache(supabase, {
+    key: "analytics",
+    etag: null,
+    attempted_at: now.toISOString(),
+    fetched_at: now.toISOString(),
+    payload: { days: outcome.report.days.length },
+    ok: true,
+  });
+  return { status: saved ? "updated" : "failed" };
+}
+
+export async function refreshTikTok(
+  now = new Date(),
+  supabase = createServiceClient(),
+): Promise<{ status: "unconfigured" | "skipped" | "updated" | "failed" | "unavailable" }> {
+  if (!zernioConfigured()) return { status: "unconfigured" };
+  const row = await readCache(supabase, "tiktok");
+  if (row === "unavailable") return { status: "unavailable" };
+  if (row && !shouldRefresh(row.attempted_at, now, TIKTOK_INTERVAL_MS)) return { status: "skipped" };
+  const previousTitle = cacheTitle(row);
+  if (!(await claim(supabase, "tiktok", now))) return { status: "unavailable" };
+  const outcome = await fetchTikTok(process.env, fetch, now);
+  if (outcome.status !== "updated") return { status: "failed" };
+  const stored = await storeMetrics(supabase, tiktokToMetrics(outcome.report), now, ["tiktok.views.day."]);
+  if (!stored) return { status: "failed" };
+  const saved = await writeCache(supabase, {
+    key: "tiktok",
+    etag: null,
+    attempted_at: now.toISOString(),
+    fetched_at: now.toISOString(),
+    payload: { videoTitle: outcome.report.video?.title ?? previousTitle },
+    ok: true,
+  });
+  return { status: saved ? "updated" : "failed" };
 }
 
 export async function readCalendarFetchedAt(supabase: Client): Promise<string | null> {
@@ -230,10 +293,34 @@ async function writeCache(supabase: Client, row: CacheRow): Promise<boolean> {
   return !error;
 }
 
-function weatherPayload(value: Json): { tempC: number; label: string } | null {
+function weatherPayload(value: Json): { tempC: number; label: string; hours: ForecastHour[] } | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const temp = value.tempC;
   const label = value.label;
   if (typeof temp !== "number" || !Number.isFinite(temp) || typeof label !== "string") return null;
-  return { tempC: temp, label };
+  return { tempC: temp, label, hours: forecastHours(value.hours) };
+}
+
+function cacheTitle(row: CacheRow | null | "unavailable"): string | null {
+  if (!row || row === "unavailable" || !row.payload || typeof row.payload !== "object" || Array.isArray(row.payload)) return null;
+  const title = row.payload.videoTitle;
+  return typeof title === "string" && title.trim() ? title : null;
+}
+
+function forecastHours(value: Json | undefined): ForecastHour[] {
+  if (!Array.isArray(value)) return [];
+  const hours: ForecastHour[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) continue;
+    const time = item.time;
+    const code = item.code;
+    const precipitationMm = item.precipitationMm;
+    if (typeof time !== "string" || typeof code !== "number") continue;
+    hours.push({
+      time,
+      code,
+      precipitationMm: typeof precipitationMm === "number" && Number.isFinite(precipitationMm) ? precipitationMm : 0,
+    });
+  }
+  return hours;
 }

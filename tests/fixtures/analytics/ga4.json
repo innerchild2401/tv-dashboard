@@ -1,0 +1,30 @@
+{
+  "days": {
+    "rows": [
+      {
+        "dimensionValues": [{ "value": "20261106" }],
+        "metricValues": [{ "value": "15" }]
+      },
+      {
+        "dimensionValues": [{ "value": "20261107" }],
+        "metricValues": [{ "value": "19" }]
+      }
+    ]
+  },
+  "pages": {
+    "rows": [
+      {
+        "dimensionValues": [{ "value": "/" }],
+        "metricValues": [{ "value": "9" }]
+      }
+    ]
+  },
+  "sources": {
+    "rows": [
+      {
+        "dimensionValues": [{ "value": "google" }],
+        "metricValues": [{ "value": "6" }]
+      }
+    ]
+  }
+}

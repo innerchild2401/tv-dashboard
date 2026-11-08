@@ -2,7 +2,7 @@
 
 A self-hosted dashboard for a Chromecast. One Next.js app serves the TV page, the phone remote, and the API. Supabase holds the data. Vercel hosts the app. Grokbot writes through `/mcp` or `POST /api/agent/<tool>` with the `AGENT_TOKEN` bearer token.
 
-The TV page renders seven screens from the sample seed: Today, Week, Month, Site, TikTok, Vision board and Home. `/api/state` chooses the screen. Rotation uses each view's weight and dwell, skips an empty view, and gives Today's weight to Week when today has no events. A content-free Realtime broadcast asks the TV to refetch; it also polls every 30 seconds. A failed refetch leaves the last screen up. The page reloads itself once, around 04:00 Europe/Bucharest. Quiet hours, interrupts and time-of-day profiles are not applied yet. TikTok and analytics keys are not wired.
+The TV page renders seven screens from the sample seed: Today, Week, Month, Site, TikTok, Vision board and Home. `/api/state` chooses the screen. Rotation uses each view's weight and dwell, skips an empty view, and gives Today's weight to Week when today has no events. From 06:00 to 23:00 it follows the morning, daytime and evening profiles. Quiet hours, 23:00 to 06:00, show a dimmed clock. An event starting within 30 minutes, or a priority due within 2 hours, puts Today on screen for 2 minutes in every cycle and keeps the priority banner on every view. A birthday or a metric above twice its 7-day average adds a celebration card. Rain forecast within 2 hours of an outdoor event shows a header alert. Each of those rules can be switched off in Config on the phone. `/remote` lists the reason for every rule that is on. A content-free Realtime broadcast asks the TV to refetch; it also polls every 30 seconds. A failed refetch leaves the last screen up. The page reloads itself once, around 04:00 Europe/Bucharest.
 
 Weather comes from Open-Meteo for the location in Config (default Constanța). It refreshes every 30 minutes. If a reading has never succeeded, the header hides the weather block. A later failure keeps the last reading.
 
@@ -30,7 +30,7 @@ pnpm dev
 
 Open [http://127.0.0.1:3000/tv](http://127.0.0.1:3000/tv). In development, with `TV_TOKEN` empty, the page shows the sample Today view. A production process refuses `/tv` until `TV_TOKEN` is set, then the page expects `?token=` to match it.
 
-The phone remote is [http://127.0.0.1:3000/remote](http://127.0.0.1:3000/remote). It asks for `REMOTE_PIN` (4 to 6 digits), locks for 15 minutes after 5 wrong tries, and keeps a signed session for 30 days. From there you can pause, pin or lock a view, dim the TV, edit the layout, change vision-board cards (including a photo), check tasks and shopping, capture an inbox note, and open `/remote/system` for the Pi and the assistant log. A saved change broadcasts a content-free Realtime ping; the TV refetches, and it also polls every 30 seconds. Quiet hours, interrupts and time-of-day profiles can be edited and are stored. They are not applied to rotation yet.
+The phone remote is [http://127.0.0.1:3000/remote](http://127.0.0.1:3000/remote). It asks for `REMOTE_PIN` (4 to 6 digits), locks for 15 minutes after 5 wrong tries, and keeps a signed session for 30 days. From there you can pause, pin or lock a view, dim the TV, edit the layout, change vision-board cards (including a photo), check tasks and shopping, capture an inbox note, switch the rotation rules, and open `/remote/system` for the Pi and the assistant log. A saved change broadcasts a content-free Realtime ping; the TV refetches, and it also polls every 30 seconds. The home screen of the remote shows the current view and the reason for each active rule.
 
 ```bash
 pnpm test
@@ -54,7 +54,9 @@ The Vercel project is `tv-dashboard`, framework Next.js, function region `fra1`,
 
 Wins-card evidence is enforced with a trigger. Postgres does not allow a subquery inside a check constraint.
 
-Calendar and weather refresh from `/api/cron/calendar` (every 5 minutes) and `/api/cron/weather` (every 30 minutes). Supabase `pg_cron` and `pg_net` call those routes. The routes skip a call that arrives before the interval, so they need no secret. A read that finds stale data refreshes it as well.
+Calendar and weather refresh from `/api/cron/calendar` (every 5 minutes) and `/api/cron/weather` (every 30 minutes). Site analytics refresh from `/api/cron/analytics` (every 15 minutes) and TikTok from `/api/cron/tiktok` (every hour). Supabase `pg_cron` and `pg_net` call those routes when both extensions are installed. Both extensions are enabled on the project. The metrics migration is applied, so analytics runs every 15 minutes and TikTok every hour next to the calendar and weather jobs. The routes skip a call that arrives before the interval, so they need no secret. A read that finds stale data refreshes it as well. Vercel Cron is not used.
+
+`ANALYTICS_PROVIDER` is empty. The Site view keeps the last stored metrics, or the sample seed when none exist, and labels them. It does not call Plausible, Umami or GA4 until that variable is `plausible`, `umami` or `ga4` and that provider's keys are set. `ZERNIO_API_KEY` is empty. The TikTok view does the same: last good numbers or the sample seed, with a label, and no request to Zernio. A failed fetch leaves the previous numbers on screen. Neither path throws when a key or a provider is missing. A metric written with `set_metric` is left in place. Numbers older than the refresh interval show how long ago they were read. The view is never blank.
 
 The Pi watchdog is `pi-agent/`. The steps to copy it onto the Raspberry Pi are below. This environment cannot reach the Pi.
 

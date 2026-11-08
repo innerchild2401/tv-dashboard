@@ -38,13 +38,41 @@ const LABELS: Record<number, string> = {
   99: ro.weatherThunderHail,
 };
 
+export type ForecastHour = { time: string; code: number; precipitationMm: number };
+
 export function openMeteoUrl(latitude: number, longitude: number): string {
   const url = new URL("https://api.open-meteo.com/v1/forecast");
   url.searchParams.set("latitude", coordinate(latitude));
   url.searchParams.set("longitude", coordinate(longitude));
   url.searchParams.set("current", "temperature_2m,weather_code");
+  url.searchParams.set("hourly", "weather_code,precipitation");
+  url.searchParams.set("forecast_days", "2");
   url.searchParams.set("timezone", TIME_ZONE);
   return url.toString();
+}
+
+export function isRain(code: number, precipitationMm = 0): boolean {
+  if (precipitationMm >= 0.2) return true;
+  return (code >= 51 && code <= 67) || (code >= 80 && code <= 82) || (code >= 95 && code <= 99);
+}
+
+export function parseForecast(body: unknown): ForecastHour[] {
+  if (!body || typeof body !== "object") return [];
+  const hourly = (body as { hourly?: unknown }).hourly;
+  if (!hourly || typeof hourly !== "object") return [];
+  const fields = hourly as { time?: unknown; weather_code?: unknown; precipitation?: unknown };
+  if (!Array.isArray(fields.time) || !Array.isArray(fields.weather_code)) return [];
+  const hours: ForecastHour[] = [];
+  const count = Math.min(fields.time.length, fields.weather_code.length, 48);
+  for (let index = 0; index < count; index += 1) {
+    const time = fields.time[index];
+    const code = fields.weather_code[index];
+    const rain = Array.isArray(fields.precipitation) ? fields.precipitation[index] : 0;
+    if (typeof time !== "string" || typeof code !== "number" || !Number.isFinite(code)) continue;
+    const precipitationMm = typeof rain === "number" && Number.isFinite(rain) ? rain : 0;
+    hours.push({ time, code, precipitationMm });
+  }
+  return hours;
 }
 
 export function weatherLabel(code: number): string {

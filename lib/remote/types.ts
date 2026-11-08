@@ -35,6 +35,7 @@ export type RemoteBoard = {
   dimmed: boolean;
   viewId: ViewId;
   reason: string;
+  notices: { id: string; reason: string }[];
   until: string;
   dwellRemaining: number;
   priority: { text: string; reason: string } | null;

@@ -120,9 +120,10 @@ export function memorySnapshot(now: Date): Snapshot | null {
     cards: state.cards.filter((card) => !card.deletedAt).map((card) => toSnapshotCard(state, card)),
     priorities: state.priorities
       .filter((item) => !item.deletedAt)
-      .map(({ text, reason, expiresAt, source, locked, updatedAt }) => ({
+      .map(({ text, reason, dueAt, expiresAt, source, locked, updatedAt }) => ({
         text,
         reason,
+        dueAt,
         expiresAt,
         source,
         locked,

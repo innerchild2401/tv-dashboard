@@ -25,3 +25,15 @@ export function updatedLabel(fetchedAt: string | null, now: Date, thresholdMs: n
   if (!Number.isFinite(age) || age <= thresholdMs) return null;
   return formatAge(age);
 }
+
+export function sourcedLabel(
+  origin: "live" | "sample" | "kept",
+  fetchedAt: string | null,
+  now: Date,
+  thresholdMs: number,
+): string | null {
+  const age = updatedLabel(fetchedAt, now, thresholdMs);
+  if (origin === "live") return age;
+  if (origin === "kept") return age ?? ro.keptData;
+  return age ? `${ro.sampleData} · ${age}` : ro.sampleData;
+}

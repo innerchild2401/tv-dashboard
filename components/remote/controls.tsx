@@ -17,6 +17,13 @@ export function Controls() {
       <p>
         {ro.remote.why}: {board.reason}
       </p>
+      {board.notices.length > 0 ? (
+        <ul className="rule-list">
+          {board.notices.map((notice) => (
+            <li key={`${notice.id}-${notice.reason}`}>{notice.reason}</li>
+          ))}
+        </ul>
+      ) : null}
       <div className="pair">
         <button type="button" onClick={() => void send("/api/remote/control", { type: "previous" })}>
           {ro.remote.previous}

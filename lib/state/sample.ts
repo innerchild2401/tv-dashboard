@@ -36,6 +36,11 @@ export function sampleSnapshot(now: Date): Snapshot {
       {
         text: sampleSchedule.priority.text,
         reason: sampleSchedule.priority.reason,
+        dueAt: zonedTimeToUtc({
+          ...today,
+          hour: sampleSchedule.priority.due.hour,
+          minute: sampleSchedule.priority.due.minute,
+        }).toISOString(),
         expiresAt: endOfZonedDay(today).toISOString(),
         source: "assistant",
         locked: false,

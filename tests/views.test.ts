@@ -102,7 +102,7 @@ describe("calendar views", () => {
       const state = buildTvState(snapshot, morning, viewId);
       assert.equal(state.currentView, viewId);
       assert.equal(state[viewId] === null, false);
-      assert.ok(state.chrome.priority);
+      assert.equal(Boolean(state.chrome.priority), viewId === "today");
       assert.equal(state.chrome.pills.length, 7);
     }
     const vision = buildTvState(snapshot, morning, "vision").vision;
@@ -111,7 +111,8 @@ describe("calendar views", () => {
     assert.equal(home?.groups.length, 3);
     const site = buildTvState(snapshot, morning, "site").site;
     assert.equal(site?.series.length, 30);
-    assert.equal(site?.updatedLabel, null);
+    assert.equal(site?.updatedLabel, "Date de exemplu");
+    assert.notEqual(site?.stats[0]?.value, "");
   });
 });
 

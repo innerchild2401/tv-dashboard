@@ -1,0 +1,32 @@
+{
+  "posts": {
+    "posts": [
+      {
+        "publishedAt": "2026-11-07T08:00:00.000Z",
+        "title": "Dimineața la mal",
+        "analytics": { "views": 8200, "likes": 640 }
+      },
+      {
+        "publishedAt": "2026-11-06T12:00:00.000Z",
+        "content": "Seara",
+        "analytics": { "views": 1500, "likes": 80 }
+      }
+    ]
+  },
+  "followers": {
+    "accounts": [
+      { "platform": "tiktok", "stats": { "followers": 12840, "previousFollowers": 12710 } }
+    ]
+  },
+  "insights": {
+    "metrics": {
+      "follower_count": {
+        "total": 12840,
+        "values": [
+          { "date": "2026-11-06", "value": 12710 },
+          { "date": "2026-11-07", "value": 12840 }
+        ]
+      }
+    }
+  }
+}

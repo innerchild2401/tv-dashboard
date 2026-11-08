@@ -16,6 +16,7 @@ export async function loadRemoteBoard(now = new Date()): Promise<RemoteBoard> {
     dimmed: tv.dimmed,
     viewId: tv.currentView,
     reason: tv.reason,
+    notices: tv.notices,
     until: tv.until,
     dwellRemaining: tv.dwellRemaining,
     priority: tv.chrome.priority,

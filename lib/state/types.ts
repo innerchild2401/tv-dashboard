@@ -57,6 +57,7 @@ export type SnapshotMetric = {
 export type SnapshotPriority = {
   text: string;
   reason: string;
+  dueAt: string | null;
   expiresAt: string;
   source: "manual" | "assistant" | "integration";
   locked: boolean;
@@ -80,14 +81,22 @@ export type Snapshot = {
   priorities: SnapshotPriority[];
   metrics: SnapshotMetric[];
   inboxWaiting: number;
-  weather: { location: string; tempC: number | null; label: string | null; fetchedAt: string | null };
+  weather: {
+    location: string;
+    tempC: number | null;
+    label: string | null;
+    fetchedAt: string | null;
+    hours?: { time: string; code: number; precipitationMm: number }[];
+  };
   calendarFetchedAt: string | null;
+  tiktokVideoTitle?: string | null;
 };
 
 export type ChromeModel = {
   clock: string;
   dateLabel: string;
   weather: { location: string; tempC: string; label: string; updatedLabel: string | null };
+  alert: string | null;
   priority: { text: string; reason: string } | null;
   pills: { id: ViewId; label: string; active: boolean }[];
   accent: string;
@@ -132,6 +141,7 @@ export type SiteModel = {
   updatedLabel: string | null;
   pages: { label: string; value: string }[];
   sources: { label: string; value: string }[];
+  celebration: string | null;
 };
 
 export type TikTokModel = {
@@ -141,6 +151,7 @@ export type TikTokModel = {
   bars: { label: string; value: number }[];
   video: { title: string; views: string; likes: string } | null;
   updatedLabel: string | null;
+  celebration: string | null;
 };
 
 export type VisionCardModel = {
@@ -163,7 +174,7 @@ export type VisionCardModel = {
   photoUrl: string | null;
 };
 
-export type VisionModel = { cards: VisionCardModel[] };
+export type VisionModel = { cards: VisionCardModel[]; celebration: string | null };
 
 export type HomeModel = {
   tasks: { id: string; text: string; done: boolean; due: string | null; person: PersonChip | null }[];
@@ -180,6 +191,8 @@ export type TvState = {
   dwellRemaining: number;
   hold: HoldMode;
   dimmed: boolean;
+  quiet: boolean;
+  notices: { id: string; reason: string }[];
   chrome: ChromeModel;
   today: TodayModel | null;
   week: WeekModel | null;

@@ -23,7 +23,7 @@ values (
   ]'::jsonb,
   '{"start":"23:00","end":"06:00"}'::jsonb,
   '{"name":"Constanța","latitude":44.1598,"longitude":28.6348,"timezone":"Europe/Bucharest"}'::jsonb,
-  '{"todayLeadTomorrowHour":20,"skipEmpty":true,"quietHours":true,"interrupts":true}'::jsonb
+  '{"todayLeadTomorrowHour":20,"skipEmpty":true,"quietHours":true,"interrupts":true,"timeOfDay":true,"eventProximity":true,"priorityBanner":true,"celebrations":true,"weatherAlert":true}'::jsonb
 );
 
 insert into public.tasks (id, text, done, assignee_id, due_date, source, locked, external_id)

@@ -123,7 +123,7 @@ export function TvScreen({
   const dwellLabel = shown.hold === "paused" ? ro.paused : shown.hold === "locked" ? ro.lockedView : `${shown.dwellRemaining}s`;
   return (
     <main
-      className={shown.dimmed ? "tv-frame is-dim" : "tv-frame"}
+      className={["tv-frame", shown.dimmed ? "is-dim" : "", shown.quiet ? "is-quiet" : ""].filter(Boolean).join(" ")}
       data-theme={shown.chrome.theme}
       style={{ "--accent": shown.chrome.accent } as CSSProperties}
     >
@@ -139,6 +139,7 @@ export function TvScreen({
 }
 
 function ViewBody({ state }: { state: TvState }) {
+  if (state.quiet) return null;
   if (state.currentView === "today" && state.today) return <TodayView view={state.today} />;
   if (state.currentView === "week" && state.week) return <WeekView view={state.week} />;
   if (state.currentView === "month" && state.month) return <MonthView view={state.month} />;

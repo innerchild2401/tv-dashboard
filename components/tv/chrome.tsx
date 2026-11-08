@@ -33,6 +33,12 @@ export function Chrome({
         ) : null}
       </header>
 
+      {chrome.alert ? (
+        <p className="weather-alert" role="status">
+          {chrome.alert}
+        </p>
+      ) : null}
+
       {chrome.priority ? (
         <section className="priority" aria-label={ro.priority}>
           <div className="priority-bar" aria-hidden="true" />

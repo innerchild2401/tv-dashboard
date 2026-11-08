@@ -249,6 +249,28 @@ fieldset {
   min-width: 0;
 }
 
+.rule {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  color: var(--text);
+}
+
+.rule input {
+  width: 28px;
+  height: 28px;
+}
+
+.rule-list {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.rule-list li {
+  margin: 4px 0;
+}
+
 .check {
   justify-content: center;
   width: 44px;

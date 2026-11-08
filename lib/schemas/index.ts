@@ -186,12 +186,29 @@ export const configSchema = z.object({
     longitude: z.number().min(-180).max(180),
     timezone: z.literal("Europe/Bucharest"),
   }),
-  rules: z.object({
-    todayLeadTomorrowHour: z.number().int().min(0).max(23),
-    skipEmpty: z.boolean(),
-    quietHours: z.boolean(),
-    interrupts: z.boolean(),
-  }),
+  rules: z
+    .object({
+      todayLeadTomorrowHour: z.number().int().min(0).max(23).default(20),
+      skipEmpty: z.boolean().default(true),
+      quietHours: z.boolean().default(true),
+      interrupts: z.boolean().default(true),
+      timeOfDay: z.boolean().default(true),
+      eventProximity: z.boolean().default(true),
+      priorityBanner: z.boolean().default(true),
+      celebrations: z.boolean().default(true),
+      weatherAlert: z.boolean().default(true),
+    })
+    .default({
+      todayLeadTomorrowHour: 20,
+      skipEmpty: true,
+      quietHours: true,
+      interrupts: true,
+      timeOfDay: true,
+      eventProximity: true,
+      priorityBanner: true,
+      celebrations: true,
+      weatherAlert: true,
+    }),
 });
 
 export type Card = z.infer<typeof cardSchema>;

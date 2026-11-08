@@ -1,0 +1,20 @@
+{
+  "timeseries": {
+    "results": [
+      { "date": "2026-11-06", "visitors": 40 },
+      { "date": "2026-11-07", "visitors": 55 }
+    ]
+  },
+  "pages": {
+    "results": [
+      { "page": "/", "visitors": 30 },
+      { "page": "/jurnal", "visitors": 12 }
+    ]
+  },
+  "sources": {
+    "results": [
+      { "source": "Direct", "visitors": 20 },
+      { "source": "Căutare", "visitors": 9 }
+    ]
+  }
+}

@@ -1,7 +1,7 @@
-import { ro, rotationReason, type ViewId } from "@/i18n/ro";
+import { ro, type ViewId } from "@/i18n/ro";
 import { activeHold, ROTATE_CONTROL, type DisplayControl } from "@/lib/remote/hold";
 import { accentColor } from "@/lib/theme/accent";
-import { prepareCandidates, resolveRotation } from "@/lib/rotation/engine";
+import { activePriority, evaluateRules } from "@/lib/rotation/rules";
 import { viewCandidates } from "@/lib/state/availability";
 import { projectWeek, projectMonth } from "@/lib/views/calendar";
 import { projectHome, projectVision } from "@/lib/views/household";
@@ -19,31 +19,41 @@ export function buildTvState(
   control: DisplayControl = ROTATE_CONTROL,
 ): TvState {
   const configured = viewCandidates(snapshot, now);
-  const prepared = prepareCandidates(configured, snapshot.config.rules.skipEmpty);
-  const pool = prepared.length > 0 ? prepared : configured;
-  const decision = resolveRotation(now, pool);
+  const smart = evaluateRules({
+    now,
+    config: snapshot.config,
+    events: snapshot.events,
+    priorities: snapshot.priorities,
+    metrics: snapshot.metrics,
+    forecast: snapshot.weather.hours ?? [],
+    candidates: configured,
+  });
   const enabled = configured.map((view) => view.id);
   const held = activeHold(control, now, enabled);
   const forced = forceView && enabled.includes(forceView) ? forceView : null;
-  const current = forced ?? held.viewId ?? decision.viewId;
-  const active = pool.find((view) => view.id === current) ?? configured.find((view) => view.id === current);
-  const dwellSeconds = active?.dwellSeconds ?? decision.dwellSeconds;
-  const weight = active?.weight ?? decision.weight;
-  let until = forced ? new Date(now.getTime() + dwellSeconds * 1000).toISOString() : decision.until;
-  let reason = pool.length === 0 ? ro.rotationOnly : rotationReason(current, weight);
+  const current = forced ?? held.viewId ?? smart.viewId;
+  const active = configured.find((view) => view.id === current);
+  const dwellSeconds = active?.dwellSeconds ?? smart.dwellSeconds;
+  let until = forced ? new Date(now.getTime() + dwellSeconds * 1000).toISOString() : smart.until;
+  let reason = smart.reason;
   let hold = held.mode;
+  let quiet = smart.quiet && !forced && !held.viewId;
   if (forced || !held.viewId) hold = "rotate";
   if (!forced && held.viewId && held.mode === "pinned" && control.pinnedUntil) {
     until = control.pinnedUntil;
     reason = `${ro.pinnedUntil} ${formatClock(new Date(control.pinnedUntil))}`;
+    quiet = false;
   } else if (!forced && held.mode === "paused" && held.viewId) {
     until = new Date(now.getTime() + 86_400_000).toISOString();
     reason = ro.paused;
+    quiet = false;
   } else if (!forced && held.mode === "locked" && held.viewId) {
     until = new Date(now.getTime() + 86_400_000).toISOString();
     reason = ro.lockedView;
+    quiet = false;
   }
-  const priority = activePriority(snapshot, now);
+  const priority = activePriority(snapshot.priorities, now);
+  const visible = quiet ? null : current;
   const calendarNote = updatedLabel(snapshot.calendarFetchedAt, now, CALENDAR_INTERVAL_MS);
   const today = projectTodayFromEvents({
     now,
@@ -76,6 +86,8 @@ export function buildTvState(
     dwellRemaining: Math.max(0, Math.round((new Date(until).getTime() - now.getTime()) / 1000)),
     hold,
     dimmed: control.dimmed,
+    quiet,
+    notices: smart.notices,
     chrome: {
       clock: formatClock(now),
       dateLabel: formatLongDate(now),
@@ -85,7 +97,8 @@ export function buildTvState(
         label: snapshot.weather.label ?? "",
         updatedLabel: updatedLabel(snapshot.weather.fetchedAt, now, WEATHER_INTERVAL_MS),
       },
-      priority,
+      alert: quiet ? null : smart.alert,
+      priority: showPriority(snapshot.config.rules.priorityBanner, priority, current, quiet, hold === "locked" || smart.priorityEverywhere),
       accent: accentColor(snapshot.config.theme.accent),
       theme: snapshot.config.theme.mode,
       pills: configured.map((view) => ({
@@ -95,13 +108,13 @@ export function buildTvState(
       })),
     },
     ...empty,
-    today: current === "today" ? { ...todayBody(today), updatedLabel: calendarNote } : null,
-    week: current === "week" ? { ...projectWeek(snapshot, now), updatedLabel: calendarNote } : null,
-    month: current === "month" ? { ...projectMonth(snapshot, now), updatedLabel: calendarNote } : null,
-    site: current === "site" ? projectSite(snapshot, now) : null,
-    tiktok: current === "tiktok" ? projectTikTok(snapshot, now) : null,
-    vision: current === "vision" ? projectVision(snapshot, now) : null,
-    home: current === "home" ? projectHome(snapshot, now) : null,
+    today: visible === "today" ? { ...todayBody(today), updatedLabel: calendarNote } : null,
+    week: visible === "week" ? { ...projectWeek(snapshot, now), updatedLabel: calendarNote } : null,
+    month: visible === "month" ? { ...projectMonth(snapshot, now), updatedLabel: calendarNote } : null,
+    site: visible === "site" ? withCelebration(projectSite(snapshot, now), smart.celebrations, "site") : null,
+    tiktok: visible === "tiktok" ? withCelebration(projectTikTok(snapshot, now), smart.celebrations, "tiktok") : null,
+    vision: visible === "vision" ? projectVision(snapshot, now, celebrationText(smart.celebrations, "vision")) : null,
+    home: visible === "home" ? projectHome(snapshot, now) : null,
   };
 }
 
@@ -118,11 +131,27 @@ function todayBody(today: ReturnType<typeof projectTodayFromEvents>): Omit<Today
   };
 }
 
-function activePriority(snapshot: Snapshot, now: Date): { text: string; reason: string } | null {
-  const live = snapshot.priorities
-    .filter((item) => new Date(item.expiresAt).getTime() > now.getTime())
-    .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
-  const chosen = live.find((item) => item.locked || item.source === "manual") ?? live[0];
-  if (!chosen) return null;
-  return { text: chosen.text, reason: chosen.reason };
+function showPriority(
+  enabled: boolean,
+  priority: { text: string; reason: string } | null,
+  current: ViewId,
+  quiet: boolean,
+  everywhere: boolean,
+): { text: string; reason: string } | null {
+  if (!enabled || !priority || quiet) return null;
+  if (everywhere || current === "today") return { text: priority.text, reason: priority.reason };
+  return null;
+}
+
+function celebrationText(items: { view: string; text: string }[], view: string): string | null {
+  return items.find((item) => item.view === view)?.text ?? null;
+}
+
+function withCelebration<T extends { celebration: string | null }>(
+  model: T,
+  items: { view: string; text: string }[],
+  view: string,
+): T {
+  model.celebration = celebrationText(items, view);
+  return model;
 }

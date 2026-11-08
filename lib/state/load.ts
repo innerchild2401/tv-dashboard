@@ -1,4 +1,4 @@
-import { readCalendarFetchedAt, readWeather, refreshDueIntegrations } from "@/lib/adapters/run";
+import { readCalendarFetchedAt, readTikTokTitle, readWeather, refreshDueIntegrations } from "@/lib/adapters/run";
 import { createServiceClient, databaseConfigured } from "@/lib/db/server";
 import { signPhotoMap } from "@/lib/photos/access";
 import { hasRemoteMemory, memorySnapshot } from "@/lib/remote/memory";
@@ -55,7 +55,7 @@ async function loadDatabaseSnapshot(now: Date): Promise<Snapshot> {
         .limit(5),
       supabase
         .from("priorities")
-        .select("text, reason, expires_at, source, locked, updated_at")
+        .select("text, reason, due_at, expires_at, source, locked, updated_at")
         .is("deleted_at", null)
         .order("updated_at", { ascending: false })
         .limit(10),
@@ -140,8 +140,10 @@ async function loadDatabaseSnapshot(now: Date): Promise<Snapshot> {
     tempC: null,
     label: null,
     fetchedAt: null,
+    hours: [],
   }));
   const calendarFetchedAt = await readCalendarFetchedAt(supabase).catch(() => null);
+  const tiktokVideoTitle = await readTikTokTitle(supabase).catch(() => null);
 
   return {
     config,
@@ -183,6 +185,7 @@ async function loadDatabaseSnapshot(now: Date): Promise<Snapshot> {
       (row): SnapshotPriority => ({
         text: row.text,
         reason: row.reason,
+        dueAt: row.due_at,
         expiresAt: row.expires_at,
         source: row.source,
         locked: row.locked,
@@ -193,6 +196,7 @@ async function loadDatabaseSnapshot(now: Date): Promise<Snapshot> {
     inboxWaiting: inboxResult.data?.length ?? 0,
     weather,
     calendarFetchedAt,
+    tiktokVideoTitle,
   };
 }
 

@@ -3,7 +3,8 @@ import type { SiteModel } from "@/lib/state/types";
 
 export function SiteView({ view }: { view: SiteModel }) {
   return (
-    <section className="site" aria-label={ro.views.site}>
+    <section className={view.celebration ? "site has-celebration" : "site"} aria-label={ro.views.site}>
+      {view.celebration ? <Celebration text={view.celebration} /> : null}
       <div className="stat-row">
         {view.stats.map((stat) => (
           <article key={stat.label} className="stat">
@@ -25,6 +26,15 @@ export function SiteView({ view }: { view: SiteModel }) {
         <Ranked title={ro.sources} rows={view.sources} />
       </div>
     </section>
+  );
+}
+
+function Celebration({ text }: { text: string }) {
+  return (
+    <article className="celebrate">
+      <p className="kicker">{ro.remote.ruleCelebration}</p>
+      <h2>{text}</h2>
+    </article>
   );
 }
 

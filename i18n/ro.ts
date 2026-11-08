@@ -71,6 +71,15 @@ export const ro = {
   chartTiktok: "Vizualizări pe zile",
   updated: "Actualizat acum",
   rotationOnly: "Singurul ecran",
+  quietHours: "Ore liniștite",
+  profile: "Profil",
+  eventIn: "Eveniment în",
+  priorityIn: "Prioritate în",
+  celebrationDay: "Aniversare azi",
+  aboveAverage: "peste media de 7 zile",
+  rainNear: "Ploaie aproape de",
+  sampleData: "Date de exemplu",
+  keptData: "Date păstrate",
   dueToday: "azi",
   photo: "Fotografie",
   weight: "pondere",
@@ -138,7 +147,14 @@ export const ro = {
     latitude: "Latitudine",
     longitude: "Longitudine",
     profiles: "Profiluri",
-    profileNote: "Profilurile și orele liniștite se salvează. Rotirea folosește încă ponderile fiecărui ecran.",
+    profileNote: "Profilul orei se aplică când regula este pornită.",
+    rulesTitle: "Reguli",
+    ruleTime: "Ora din zi",
+    ruleEvent: "Eveniment aproape",
+    rulePriority: "Banner de prioritate",
+    ruleCelebration: "Sărbători",
+    ruleWeather: "Alertă de ploaie",
+    ruleQuiet: "Ore liniștite",
     morning: "Dimineața",
     daytime: "Ziua",
     evening: "Seara",
@@ -258,4 +274,31 @@ export const VIEW_IDS: ViewId[] = ["today", "week", "month", "site", "tiktok", "
 
 export function rotationReason(id: ViewId, weight: number): string {
   return `${ro.views[id]} · ${ro.weight} ${weight}`;
+}
+
+export function profileLabel(id: string): string {
+  if (id === "morning") return ro.remote.morning;
+  if (id === "daytime") return ro.remote.daytime;
+  if (id === "evening") return ro.remote.evening;
+  return id;
+}
+
+export function eventSoon(title: string, minutes: number): string {
+  return `${ro.eventIn} ${minutes} min: ${title}`;
+}
+
+export function prioritySoon(minutes: number): string {
+  return `${ro.priorityIn} ${minutes} min`;
+}
+
+export function celebrationDay(title: string): string {
+  return `${ro.celebrationDay}: ${title}`;
+}
+
+export function aboveAverage(view: string): string {
+  return `${view} ${ro.aboveAverage}`;
+}
+
+export function rainNear(title: string): string {
+  return `${ro.rainNear} ${title}`;
 }

@@ -188,14 +188,27 @@ export function Editor() {
           <input type="time" value={config.quietHours.end} onChange={(event) => update({ ...config, quietHours: { ...config.quietHours, end: event.target.value } })} />
         </label>
       </div>
-      <label className="check">
-        <input
-          type="checkbox"
-          checked={config.rules.skipEmpty}
-          onChange={(event) => update({ ...config, rules: { ...config.rules, skipEmpty: event.target.checked } })}
-        />
-        {ro.remote.skipEmpty}
-      </label>
+      <h2>{ro.remote.rulesTitle}</h2>
+      {(
+        [
+          ["quietHours", ro.remote.ruleQuiet],
+          ["timeOfDay", ro.remote.ruleTime],
+          ["eventProximity", ro.remote.ruleEvent],
+          ["priorityBanner", ro.remote.rulePriority],
+          ["celebrations", ro.remote.ruleCelebration],
+          ["weatherAlert", ro.remote.ruleWeather],
+          ["skipEmpty", ro.remote.skipEmpty],
+        ] as const
+      ).map(([key, label]) => (
+        <label key={key} className="rule">
+          <input
+            type="checkbox"
+            checked={config.rules[key]}
+            onChange={(event) => update({ ...config, rules: { ...config.rules, [key]: event.target.checked } })}
+          />
+          {label}
+        </label>
+      ))}
       <label>
         {ro.remote.leadHour}
         <input

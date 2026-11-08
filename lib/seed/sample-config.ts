@@ -68,5 +68,10 @@ export const sampleConfig = {
     skipEmpty: true,
     quietHours: true,
     interrupts: true,
+    timeOfDay: true,
+    eventProximity: true,
+    priorityBanner: true,
+    celebrations: true,
+    weatherAlert: true,
   },
 };

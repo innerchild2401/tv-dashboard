@@ -1,5 +1,5 @@
 import { ro } from "@/i18n/ro";
-import { formatCount, formatPercentDelta, updatedLabel } from "@/lib/format/display";
+import { formatCount, formatPercentDelta, sourcedLabel } from "@/lib/format/display";
 import { SAMPLE_VIDEO_TITLE, SITE_FRESH_MS, TIKTOK_FRESH_MS } from "@/lib/seed/sample-metrics";
 import type { SiteModel, Snapshot, SnapshotMetric, StatModel, TikTokModel } from "@/lib/state/types";
 import { zonedTimeToUtc } from "@/lib/time/bucharest";
@@ -31,9 +31,10 @@ export function projectSite(snapshot: Snapshot, now: Date): SiteModel {
       stat(ro.thirtyDays, monthValue, month?.previous ?? null),
     ],
     series: days.map((point) => point.value),
-    updatedLabel: updatedLabel(newest(snapshot.metrics, "site."), now, SITE_FRESH_MS),
+    updatedLabel: sourcedLabel(metricOrigin(snapshot.metrics, "site.", now, SITE_FRESH_MS), newest(snapshot.metrics, "site."), now, SITE_FRESH_MS),
     pages: ranked(snapshot.metrics, "site.page.", PAGE_LABELS),
     sources: ranked(snapshot.metrics, "site.source.", SOURCE_LABELS),
+    celebration: null,
   };
 }
 
@@ -44,6 +45,7 @@ export function projectTikTok(snapshot: Snapshot, now: Date): TikTokModel {
   const days = series(snapshot.metrics, "tiktok.views.day.");
   const videoViews = metric(snapshot.metrics, "tiktok.video.views");
   const videoLikes = metric(snapshot.metrics, "tiktok.video.likes");
+  const videoTitle = snapshot.tiktokVideoTitle?.trim() || (videoViews?.source === "integration" ? ro.lastVideo : SAMPLE_VIDEO_TITLE);
   return {
     followers: stat(ro.followers, followers?.value ?? 0, followers?.previous ?? null),
     views: stat(ro.viewsLabel, views?.value ?? sumLast(days, 7), views?.previous ?? null),
@@ -54,12 +56,18 @@ export function projectTikTok(snapshot: Snapshot, now: Date): TikTokModel {
     })),
     video: videoViews
       ? {
-          title: SAMPLE_VIDEO_TITLE,
+          title: videoTitle,
           views: formatCount(videoViews.value),
           likes: formatCount(videoLikes?.value ?? 0),
         }
       : null,
-    updatedLabel: updatedLabel(newest(snapshot.metrics, "tiktok."), now, TIKTOK_FRESH_MS),
+    updatedLabel: sourcedLabel(
+      metricOrigin(snapshot.metrics, "tiktok.", now, TIKTOK_FRESH_MS),
+      newest(snapshot.metrics, "tiktok."),
+      now,
+      TIKTOK_FRESH_MS,
+    ),
+    celebration: null,
   };
 }
 
@@ -80,6 +88,17 @@ function series(metrics: SnapshotMetric[], prefix: string): { key: string; value
 
 function sumLast(points: { value: number }[], count: number): number {
   return points.slice(-count).reduce((sum, point) => sum + point.value, 0);
+}
+
+function metricOrigin(metrics: SnapshotMetric[], prefix: string, now: Date, freshMs: number): "live" | "sample" | "kept" {
+  const rows = metrics.filter((metric) => metric.key.startsWith(prefix) && metric.source === "integration");
+  if (rows.length === 0) return "sample";
+  let newest = 0;
+  for (const row of rows) {
+    const time = new Date(row.fetchedAt).getTime();
+    if (time > newest) newest = time;
+  }
+  return now.getTime() - newest > freshMs ? "kept" : "live";
 }
 
 function newest(metrics: SnapshotMetric[], prefix: string): string | null {

@@ -17,8 +17,26 @@
   --banner: #e5f7f3;
 }
 
-.tv-frame.is-dim .tv-stage {
+.tv-frame.is-dim .tv-stage,
+.tv-frame.is-quiet .tv-stage {
   opacity: 0.38;
+}
+
+.tv-frame.is-quiet .date-label,
+.tv-frame.is-quiet .weather,
+.tv-frame.is-quiet .priority,
+.tv-frame.is-quiet .weather-alert,
+.tv-frame.is-quiet .tv-main,
+.tv-frame.is-quiet .pills {
+  display: none;
+}
+
+.tv-frame.is-quiet .tv-canvas {
+  justify-content: center;
+}
+
+.tv-frame.is-quiet .clock {
+  font-size: 96px;
 }
 
 .tv-slot {
@@ -582,6 +600,44 @@
 
 .site {
   grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.site.has-celebration {
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+}
+
+.tiktok.has-celebration {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.celebrate {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 10px 16px;
+  border-radius: 14px;
+  background: #ffd166;
+  color: #1b1b2f;
+}
+
+.celebrate h2 {
+  margin: 2px 0 0;
+  font-family: Fredoka, "Space Grotesk", sans-serif;
+  font-size: 28px;
+}
+
+.weather-alert {
+  margin: 0;
+  padding: 10px 16px;
+  border-radius: 14px;
+  background: #16384a;
+  color: #d7f3ff;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.tv-frame[data-theme="light"] .weather-alert {
+  background: #d7eef8;
+  color: #1b1b2f;
 }
 
 .stat-row,
