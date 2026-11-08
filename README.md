@@ -2,7 +2,7 @@
 
 A self-hosted dashboard for a Chromecast. One Next.js app serves the TV page, the phone remote, the API, and the MCP endpoint. Supabase holds the data. Vercel hosts the app. Grokbot writes through `/mcp` or `POST /api/agent/<tool>` with the `AGENT_TOKEN` bearer token.
 
-The TV page renders seven screens: Today, Week, Momente, Site, TikTok, Vision board, and Home. `/api/state` chooses the screen. From 06:00 to 23:00 it follows the morning, daytime, and evening profiles. Quiet hours, 23:00 to 06:00 Europe/Bucharest, show a dimmed clock. An event starting within 30 minutes, or a priority due within 2 hours, puts Today on screen for 2 minutes in every cycle and keeps the priority banner on every view. A birthday or a metric above twice its 7-day average adds a celebration card. Rain forecast within 2 hours of an outdoor event shows a header alert. Each rule can be switched off on the phone. `/remote` lists the reason for every rule that is on. A content-free Realtime broadcast asks the TV to refetch. It also polls every 30 seconds. A failed refetch leaves the last screen up. The page reloads itself once, around 04:00 Europe/Bucharest.
+The TV page renders five screens: Today, Week, Momente, Vision board, and Home. `/api/state` chooses the screen with a simple round-robin (120 seconds each, no immediate repeat). Empty views are skipped when `skipEmpty` is on. Quiet hours, 23:00 to 06:00 Europe/Bucharest, show a dimmed clock. An event starting within 30 minutes, or a priority due within 2 hours, puts Today on screen for 2 minutes in every cycle and keeps the priority banner on every view. A birthday adds a celebration card on Vision. Rain forecast within 2 hours of an outdoor event shows a header alert. Each rule can be switched off on the phone. `/remote` lists the reason for every rule that is on. A content-free Realtime broadcast asks the TV to refetch. It also polls every 30 seconds. A failed refetch leaves the last screen up. The page reloads itself once, around 04:00 Europe/Bucharest.
 
 ## Defaults
 
@@ -23,7 +23,7 @@ The TV page renders seven screens: Today, Week, Momente, Site, TikTok, Vision bo
 
 ## Fresh deploy
 
-These steps are enough to put this repository on a new machine and on Vercel. Do not commit a secret. Do not invent an iCal address, a Zernio key, or an analytics key. Leave those empty until you have them.
+These steps are enough to put this repository on a new machine and on Vercel. Do not commit a secret. Do not invent an iCal address. Leave calendar URLs empty until you have them.
 
 1. Install Node 20 or newer, pnpm 10, the GitHub CLI, the [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started), and the [Vercel CLI](https://vercel.com/docs/cli). Sign in: `gh auth status`, `supabase login`, `vercel whoami`.
 
@@ -104,18 +104,16 @@ Open `/tv?token=` with `TV_TOKEN` on the Chromecast. Open `/remote` on the phone
 
 Refresh is scheduled in Supabase with `pg_cron` and `pg_net`. Vercel Cron is not used. The routes are idempotent and skip a call that arrives before the source interval, so they take no secret. A read that finds stale data refreshes it as well.
 
-Both extensions are enabled on project `xbqcywzbykstjlnrrycl`. The migrations schedule four jobs against `https://tv-dashboard-sigma-one.vercel.app`:
+Both extensions are enabled on project `xbqcywzbykstjlnrrycl`. The migrations schedule two jobs against `https://tv-dashboard-sigma-one.vercel.app`:
 
 | Job | Schedule | Route |
 | --- | --- | --- |
 | `tv-dashboard-calendar` | `*/5 * * * *` | `/api/cron/calendar` |
-| `tv-dashboard-analytics` | `*/15 * * * *` | `/api/cron/analytics` |
 | `tv-dashboard-weather` | `*/30 * * * *` | `/api/cron/weather` |
-| `tv-dashboard-tiktok` | `0 * * * *` | `/api/cron/tiktok` |
 
-Calendar feeds are `ICAL_URL_ALEX` and `ICAL_URL_MARA`. An empty variable leaves that person's seed events on screen. Weather is Open-Meteo for the place in Config (default Constanța) and needs no key. `ANALYTICS_PROVIDER` is empty, so Site does not call Plausible, Umami, or GA4. `ZERNIO_API_KEY` is empty, so TikTok does not call Zernio. A missing provider or a failed fetch keeps the last stored numbers, or the sample seed when none exist, and the view says so. A metric written with `set_metric` is left in place.
+Calendar feeds are `ICAL_URL_ALEX` and `ICAL_URL_MARA`. An empty variable leaves that person's seed events on screen. Weather is Open-Meteo for the place in Config (default Constanța) and needs no key. Site and TikTok screens (and their cron jobs) were removed; `set_metric` can still write arbitrary metric keys if needed.
 
-If the app URL changes, edit the four URLs in `supabase/migrations` before `supabase db push`.
+If the app URL changes, edit the URLs in `supabase/migrations` before `supabase db push`.
 
 ## Rate limits
 

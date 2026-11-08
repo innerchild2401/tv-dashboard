@@ -7,7 +7,6 @@ import { viewCandidates } from "@/lib/state/availability";
 import { projectWeek } from "@/lib/views/calendar";
 import { projectHome, projectVision } from "@/lib/views/household";
 import { projectMomente } from "@/lib/views/momente";
-import { projectSite, projectTikTok } from "@/lib/views/metrics";
 import { CALENDAR_INTERVAL_MS, WEATHER_INTERVAL_MS } from "@/lib/adapters/intervals";
 import { updatedLabel } from "@/lib/format/display";
 import { formatClock, formatLongDate } from "@/lib/time/bucharest";
@@ -74,8 +73,6 @@ export function buildTvState(
     today: null,
     week: null,
     momente: null,
-    site: null,
-    tiktok: null,
     vision: null,
     home: null,
   };
@@ -115,8 +112,6 @@ export function buildTvState(
     today: visible === "today" ? { ...todayBody(today), updatedLabel: calendarNote } : null,
     week: visible === "week" ? { ...projectWeek(snapshot, now), updatedLabel: calendarNote } : null,
     momente: visible === "momente" ? projectMomente(snapshot, now) : null,
-    site: visible === "site" ? withCelebration(projectSite(snapshot, now), smart.celebrations, "site") : null,
-    tiktok: visible === "tiktok" ? withCelebration(projectTikTok(snapshot, now), smart.celebrations, "tiktok") : null,
     vision: visible === "vision" ? projectVision(snapshot, now, celebrationText(smart.celebrations, "vision")) : null,
     home: visible === "home" ? projectHome(snapshot, now) : null,
   };
@@ -164,13 +159,4 @@ function showPriority(
 
 function celebrationText(items: { view: string; text: string }[], view: string): string | null {
   return items.find((item) => item.view === view)?.text ?? null;
-}
-
-function withCelebration<T extends { celebration: string | null }>(
-  model: T,
-  items: { view: string; text: string }[],
-  view: string,
-): T {
-  model.celebration = celebrationText(items, view);
-  return model;
 }

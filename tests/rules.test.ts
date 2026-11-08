@@ -32,7 +32,7 @@ describe("smart rules", () => {
   it("keeps a saved config that does not know the new switches", () => {
     const legacy = { ...sampleConfig, rules: { todayLeadTomorrowHour: 20, skipEmpty: true, quietHours: false, interrupts: true } };
     const parsed = configSchema.parse(legacy);
-    assert.equal(parsed.rules.timeOfDay, true);
+    assert.equal(parsed.rules.timeOfDay, false);
     assert.equal(parsed.rules.eventProximity, true);
     assert.equal(parsed.rules.priorityBanner, true);
     assert.equal(parsed.rules.celebrations, true);
@@ -40,18 +40,18 @@ describe("smart rules", () => {
     assert.equal(parsed.rules.quietHours, false);
   });
 
-  it("uses the morning profile and can turn it off", () => {
-    const on = decide(snapshotAt(morning), morning);
+  it("keeps time-of-day profiles off by default and can turn them on", () => {
+    const off = decide(snapshotAt(morning), morning);
+    assert.equal(off.notices.some((notice) => notice.id === "timeOfDay"), false);
+
+    const on = decide(snapshotAt(morning), morning, { timeOfDay: true });
     assert.equal(on.notices.some((notice) => notice.id === "timeOfDay" && notice.reason.includes("Dimineața")), true);
     const seen = new Set<string>();
     for (let minute = 0; minute < 50; minute += 1) {
       const now = new Date(morning.getTime() + minute * 60_000);
-      seen.add(decide(snapshotAt(now), now).viewId);
+      seen.add(decide(snapshotAt(now), now, { timeOfDay: true }).viewId);
     }
-    assert.deepEqual([...seen].sort(), ["today", "vision", "week"]);
-
-    const off = decide(snapshotAt(morning), morning, { timeOfDay: false });
-    assert.equal(off.notices.some((notice) => notice.id === "timeOfDay"), false);
+    assert.deepEqual([...seen].sort(), ["home", "momente", "today", "vision", "week"]);
   });
 
   it("shows Today for an event inside 30 minutes and explains it", () => {
@@ -97,7 +97,7 @@ describe("smart rules", () => {
     assert.ok(banner.chrome.priority);
   });
 
-  it("adds a celebration card for a birthday and for a metric that doubles its week", () => {
+  it("adds a celebration card for a birthday", () => {
     const snapshot = snapshotAt(morning);
     snapshot.events.push({
       id: "birthday",
@@ -115,17 +115,6 @@ describe("smart rules", () => {
     const off = buildTvState(snapshot, morning, "vision");
     assert.equal(off.vision?.cards.some((card) => card.id === "celebration"), false);
     assert.equal(off.notices.some((notice) => notice.id === "celebrations"), false);
-
-    const spiked = snapshotAt(morning);
-    for (const metric of spiked.metrics) {
-      if (!metric.key.startsWith("site.day.")) continue;
-      metric.value = metric.key.endsWith("2026-11-07") ? 500 : 40;
-    }
-    const site = buildTvState(spiked, morning, "site");
-    assert.match(site.site?.celebration ?? "", /Site/);
-    assert.equal(site.notices.some((notice) => notice.id === "celebrations"), true);
-    spiked.config.rules.celebrations = false;
-    assert.equal(buildTvState(spiked, morning, "site").site?.celebration, null);
   });
 
   it("warns when rain is forecast beside an outdoor plan", () => {
@@ -166,28 +155,4 @@ describe("smart rules", () => {
     assert.equal(off.notices.some((notice) => notice.id === "quietHours"), false);
   });
 
-  it("labels stale and sample metrics and still draws the numbers", () => {
-    const now = morning;
-    const sample = buildTvState(snapshotAt(now), now, "site").site;
-    assert.equal(sample?.updatedLabel, "Date de exemplu");
-    assert.equal(sample?.series.length, 30);
-    assert.notEqual(sample?.stats[0]?.value, "");
-
-    const old = snapshotAt(now);
-    const fetchedAt = new Date(now.getTime() - 3 * 60 * 60 * 1000).toISOString();
-    for (const metric of old.metrics) {
-      if (!metric.key.startsWith("site.")) continue;
-      metric.source = "integration";
-      metric.fetchedAt = fetchedAt;
-    }
-    const kept = buildTvState(old, now, "site").site;
-    assert.match(kept?.updatedLabel ?? "", /3 h/);
-    assert.equal(kept?.series.length, 30);
-
-    const empty = snapshotAt(now);
-    empty.metrics = empty.metrics.filter((metric) => !metric.key.startsWith("tiktok."));
-    const tiktok = buildTvState(empty, now, "tiktok").tiktok;
-    assert.equal(tiktok?.followers.value, "0");
-    assert.equal(tiktok?.updatedLabel, "Date de exemplu");
-  });
 });

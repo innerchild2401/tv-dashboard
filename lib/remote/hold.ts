@@ -75,7 +75,7 @@ export function applyControl(
         return { ok: true, control: { ...control, viewId: target, dimmed } };
       }
     }
-    const dwell = ctx.views.find((view) => view.id === target)?.dwellSeconds ?? 45;
+    const dwell = ctx.views.find((view) => view.id === target)?.dwellSeconds ?? 120;
     return {
       ok: true,
       control: {

@@ -22,8 +22,6 @@ export function Detail({ view }: { view: string }) {
       <h1>{ro.views[id]}</h1>
       {id === "today" || id === "week" ? <Agenda people={board.config.people} events={board.events} /> : null}
       {id === "momente" ? <MomenteList spotlights={board.spotlights} /> : null}
-      {id === "site" ? <MetricList metrics={board.metrics} prefix="site." title={ro.remote.pages} /> : null}
-      {id === "tiktok" ? <MetricList metrics={board.metrics} prefix="tiktok." title={ro.remote.videos} /> : null}
       {id === "vision" ? (
         <>
           <a href="/remote/cards">{ro.remote.openCards}</a>
@@ -126,27 +124,3 @@ function MomenteList({
   );
 }
 
-function MetricList({
-  metrics,
-  prefix,
-  title,
-}: {
-  metrics: { key: string; value: number; previous: number | null }[];
-  prefix: string;
-  title: string;
-}) {
-  const rows = metrics.filter((metric) => metric.key.startsWith(prefix));
-  return (
-    <div>
-      <h2>{title}</h2>
-      <ul className="plain-list">
-        {rows.map((metric) => (
-          <li key={metric.key}>
-            <span>{metric.key.slice(prefix.length)}</span>
-            <strong>{new Intl.NumberFormat("ro-RO").format(metric.value)}</strong>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}

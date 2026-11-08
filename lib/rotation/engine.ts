@@ -1,5 +1,5 @@
 import { rotationReason, type ViewId } from "@/i18n/ro";
-import { dateKey, zonedParts, zonedTimeToUtc, type DateParts } from "@/lib/time/bucharest";
+import { zonedParts, zonedTimeToUtc, type DateParts } from "@/lib/time/bucharest";
 
 export type RotationCandidate = {
   id: ViewId;
@@ -23,12 +23,6 @@ export function prepareCandidates(input: RotationCandidate[], skipEmpty: boolean
   let pool = views.filter((view) => view.weight > 0);
   if (!skipEmpty) return pool;
 
-  const today = pool.find((view) => view.id === "today");
-  const week = pool.find((view) => view.id === "week");
-  if (today?.empty) {
-    if (week && !week.empty) week.weight += today.weight;
-    pool = pool.filter((view) => view.id !== "today");
-  }
   pool = pool.filter((view) => !view.empty);
 
   const fresh = pool.filter((view) => !view.stale);
@@ -37,30 +31,17 @@ export function prepareCandidates(input: RotationCandidate[], skipEmpty: boolean
   return [];
 }
 
-export function slotSeed(dayKey: string, slot: number): number {
-  let hash = 2166136261;
-  const text = `${dayKey}:${slot}`;
-  for (let index = 0; index < text.length; index += 1) {
-    hash ^= text.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
+/** Next view in config order after `previous` (wraps). No-immediate-repeat when length > 1. */
+export function nextInOrder(pool: RotationCandidate[], previous: ViewId | null): RotationCandidate {
+  if (pool.length === 0) {
+    throw new Error("Rotation needs at least one view");
   }
-  return hash >>> 0;
-}
-
-export function weightedPick(
-  pool: RotationCandidate[],
-  seed: number,
-  previous: ViewId | null,
-): RotationCandidate {
-  const withoutPrevious = previous ? pool.filter((view) => view.id !== previous) : pool;
-  const choices = withoutPrevious.length > 0 ? withoutPrevious : pool;
-  const total = choices.reduce((sum, view) => sum + view.weight, 0);
-  let cursor = (seed / 4294967296) * total;
-  for (const view of choices) {
-    cursor -= view.weight;
-    if (cursor < 0) return view;
+  if (pool.length === 1 || !previous) {
+    return pool[0] as RotationCandidate;
   }
-  return choices[choices.length - 1] as RotationCandidate;
+  const index = pool.findIndex((view) => view.id === previous);
+  if (index < 0) return pool[0] as RotationCandidate;
+  return pool[(index + 1) % pool.length] as RotationCandidate;
 }
 
 export function resolveRotation(now: Date, prepared: RotationCandidate[]): RotationDecision {
@@ -72,13 +53,12 @@ export function resolveRotation(now: Date, prepared: RotationCandidate[]): Rotat
   const parts = zonedParts(now);
   const day: DateParts = { year: parts.year, month: parts.month, day: parts.day };
   const dayStart = zonedTimeToUtc({ ...day, hour: 0, minute: 0 }).getTime();
-  const key = dateKey(day);
   let cursor = dayStart;
   const nowMs = now.getTime();
   let previous: ViewId | null = null;
 
   for (let slot = 0; slot < 5000; slot += 1) {
-    const view = weightedPick(prepared, slotSeed(key, slot), previous);
+    const view = nextInOrder(prepared, previous);
     const until = cursor + view.dwellSeconds * 1000;
     if (nowMs < until) {
       return {
@@ -109,12 +89,7 @@ export function resolveRotation(now: Date, prepared: RotationCandidate[]): Rotat
  * Always treats `previous` as the view being left — required when `?view=` forces a
  * screen that is not the wall-clock pick, otherwise nextView can lock a 2-cycle.
  */
-export function peekNextView(prepared: RotationCandidate[], previous: ViewId, untilIso: string): ViewId {
+export function peekNextView(prepared: RotationCandidate[], previous: ViewId, _untilIso: string): ViewId {
   if (prepared.length === 0) return previous;
-  if (prepared.length === 1) return prepared[0]!.id;
-  const atBoundary = new Date(untilIso);
-  const parts = Number.isFinite(atBoundary.getTime()) ? zonedParts(atBoundary) : zonedParts(new Date());
-  const key = dateKey(parts);
-  const slot = Number.isFinite(atBoundary.getTime()) ? resolveRotation(atBoundary, prepared).slot : 0;
-  return weightedPick(prepared, slotSeed(key, slot), previous).id;
+  return nextInOrder(prepared, previous).id;
 }

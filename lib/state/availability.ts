@@ -53,8 +53,6 @@ export function availability(snapshot: Snapshot, now: Date): Record<ViewId, { em
     today: { empty: !todayEvents, stale: false },
     week: { empty: !weekEvents, stale: false },
     momente: { empty: !momenteLive, stale: false },
-    site: { empty: !hasPrefix(snapshot.metrics, "site."), stale: sourceIsStale(snapshot.metrics, "site.", now) },
-    tiktok: { empty: !hasPrefix(snapshot.metrics, "tiktok."), stale: sourceIsStale(snapshot.metrics, "tiktok.", now) },
     vision: { empty: !cards, stale: false },
     home: { empty: homeEmpty, stale: false },
   };
@@ -69,10 +67,6 @@ export function sourceIsStale(metrics: SnapshotMetric[], prefix: string, now: Da
     if (time > newest) newest = time;
   }
   return now.getTime() - newest > STALE_AFTER_MS;
-}
-
-function hasPrefix(metrics: SnapshotMetric[], prefix: string): boolean {
-  return metrics.some((metric) => metric.key.startsWith(prefix));
 }
 
 export function mondayIndex(day: DateParts): number {

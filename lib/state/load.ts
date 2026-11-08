@@ -1,10 +1,9 @@
-import { readCalendarFetchedAt, readTikTokTitle, readWeather, refreshDueIntegrations } from "@/lib/adapters/run";
+import { readCalendarFetchedAt, readWeather, refreshDueIntegrations } from "@/lib/adapters/run";
 import { createServiceClient, databaseConfigured } from "@/lib/db/server";
 import { signPhotoMap } from "@/lib/photos/access";
 import { hasRemoteMemory, memorySnapshot } from "@/lib/remote/memory";
 import { cardSchema, configSchema } from "@/lib/schemas";
 import { sampleConfig } from "@/lib/seed/sample-config";
-import { sampleMetrics } from "@/lib/seed/sample-metrics";
 import { sampleSnapshot } from "@/lib/state/sample";
 import type { Snapshot, SnapshotCard, SnapshotMetric, SnapshotPriority } from "@/lib/state/types";
 import { addDays, zonedParts, zonedTimeToUtc } from "@/lib/time/bucharest";
@@ -149,7 +148,7 @@ async function loadDatabaseSnapshot(now: Date): Promise<Snapshot> {
     if (typeof path === "string") card.photoUrl = signed.get(path) ?? null;
   }
 
-  const metrics = mergeSampleMetrics(eventsToMetrics(metricsResult.data ?? []), now);
+  const metrics = eventsToMetrics(metricsResult.data ?? []);
   const recapRow = (recapsResult.data ?? []).find((row) => !row.expires_at || new Date(row.expires_at).getTime() > now.getTime());
   const weather = await readWeather(supabase, config.location.name).catch(() => ({
     location: config.location.name,
@@ -159,7 +158,6 @@ async function loadDatabaseSnapshot(now: Date): Promise<Snapshot> {
     hours: [],
   }));
   const calendarFetchedAt = await readCalendarFetchedAt(supabase).catch(() => null);
-  const tiktokVideoTitle = await readTikTokTitle(supabase).catch(() => null);
 
   return {
     config,
@@ -220,7 +218,6 @@ async function loadDatabaseSnapshot(now: Date): Promise<Snapshot> {
     inboxWaiting: inboxResult.data?.length ?? 0,
     weather,
     calendarFetchedAt,
-    tiktokVideoTitle,
   };
 }
 
@@ -234,23 +231,6 @@ function eventsToMetrics(
     fetchedAt: row.fetched_at,
     source: row.source,
   }));
-}
-
-function mergeSampleMetrics(metrics: SnapshotMetric[], now: Date): SnapshotMetric[] {
-  const sample = sampleMetrics(now).map(({ key, value, previous, fetchedAt, source }) => ({
-    key,
-    value,
-    previous,
-    fetchedAt,
-    source,
-  }));
-  const hasSite = metrics.some((metric) => metric.key.startsWith("site."));
-  const hasTikTok = metrics.some((metric) => metric.key.startsWith("tiktok."));
-  return [
-    ...metrics,
-    ...(hasSite ? [] : sample.filter((metric) => metric.key.startsWith("site."))),
-    ...(hasTikTok ? [] : sample.filter((metric) => metric.key.startsWith("tiktok."))),
-  ];
 }
 
 function asNumber(value: number | string): number {

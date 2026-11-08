@@ -382,7 +382,7 @@ function schemaOf(): Outcome {
             "Seeded sample external ids: spotlight-vacanta-sample, spotlight-deadline-sample. Call delete_spotlight on those to clear Cast samples.",
         },
         rules: [
-          "A win or progress item needs evidence such as task:done:<id>, event:<id> or metric:tiktok.posts.",
+          "A win or progress item needs evidence such as task:done:<id> or event:<id>.",
           "The same externalId updates the existing row, so a daily routine can run twice.",
           "A manual or locked row is left unchanged.",
           "A priority needs a reason and expires at the end of the day unless another time is given.",

@@ -1,14 +1,12 @@
 export const ro = {
   appTitle: "Tablou",
-  homeIntro: "Televizorul rotește șapte ecrane. Datele de exemplu rămân până când calendarele și metricile reale sunt legate.",
+  homeIntro: "Televizorul rotește cinci ecrane. Datele de exemplu rămân până când calendarele reale sunt legate.",
   openTv: "Deschide ecranul TV",
   viewsNav: "Ecrane",
   views: {
     today: "Azi",
     week: "Săptămână",
     momente: "Momente",
-    site: "Site",
-    tiktok: "TikTok",
     vision: "Vision board",
     home: "Acasă",
   },
@@ -281,7 +279,7 @@ export function attemptsLeft(count: number): string {
 
 export type ViewId = keyof typeof ro.views;
 
-export const VIEW_IDS: ViewId[] = ["today", "week", "momente", "site", "tiktok", "vision", "home"];
+export const VIEW_IDS: ViewId[] = ["today", "week", "momente", "vision", "home"];
 
 export function rotationReason(id: ViewId, weight: number): string {
   return `${ro.views[id]} · ${ro.weight} ${weight}`;

@@ -98,21 +98,17 @@ describe("calendar views", () => {
 
   it("renders every view from the sample snapshot", () => {
     const snapshot = sampleSnapshot(morning);
-    for (const viewId of ["today", "week", "momente", "site", "tiktok", "vision", "home"] as const) {
+    for (const viewId of ["today", "week", "momente", "vision", "home"] as const) {
       const state = buildTvState(snapshot, morning, viewId);
       assert.equal(state.currentView, viewId);
       assert.equal(state[viewId] === null, false);
       assert.equal(Boolean(state.chrome.priority), viewId === "today");
-      assert.equal(state.chrome.pills.length, 7);
+      assert.equal(state.chrome.pills.length, 5);
     }
     const vision = buildTvState(snapshot, morning, "vision").vision;
     assert.ok((vision?.cards.length ?? 0) >= 6);
     const home = buildTvState(snapshot, morning, "home").home;
     assert.equal(home?.groups.length, 3);
-    const site = buildTvState(snapshot, morning, "site").site;
-    assert.equal(site?.series.length, 30);
-    assert.equal(site?.updatedLabel, "Date de exemplu");
-    assert.notEqual(site?.stats[0]?.value, "");
   });
 });
 

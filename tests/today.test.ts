@@ -36,6 +36,6 @@ describe("Today projection", () => {
     assert.equal(view.nextEvent?.countdown, "14 h 00 min");
     assert.ok(view.priority);
     assert.equal(view.nextDays[0]?.titles[0], "Cumpărături");
-    assert.equal(view.views.find((item) => item.active)?.dwellLabel, "45s");
+    assert.equal(view.views.find((item) => item.active)?.dwellLabel, "120s");
   });
 });
