@@ -16,7 +16,7 @@ describe("calendar views", () => {
     assert.equal(week.columns.length, 7);
     assert.equal(week.columns[2]?.isToday, true);
     assert.equal(week.columns[2]?.day, "7");
-    assert.equal(week.columns[0]?.events.some((event) => event.title === "Cafea"), true);
+    assert.equal(week.columns[0]?.events.length, 0);
     assert.equal(week.columns[1]?.events.some((event) => event.title === "Sport"), true);
     assert.equal(mondayIndex({ year: 2026, month: 11, day: 2 }), 0);
     assert.equal(mondayIndex({ year: 2026, month: 11, day: 1 }), 6);
@@ -31,7 +31,7 @@ describe("calendar views", () => {
     assert.ok(month.cells.some((cell) => !cell.inMonth));
     assert.ok(month.cells.some((cell) => cell.title === "Mic dejun"));
     const todayCell = month.cells.find((cell) => cell.isToday);
-    assert.equal(todayCell?.extra, 4);
+    assert.equal(todayCell?.extra, 3);
   });
 
   it("keeps today in column 3 across Bucharest midnight", () => {

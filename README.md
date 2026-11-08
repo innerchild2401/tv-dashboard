@@ -55,7 +55,7 @@ Paste `TV_TOKEN`, `AGENT_TOKEN`, `PI_TOKEN`, and `SESSION_SECRET` into `.env.loc
 | `TV_TOKEN`, `AGENT_TOKEN`, `PI_TOKEN` | `.env.local`, Vercel Production and Preview | yes |
 | `REMOTE_PIN` | `.env.local`, Vercel Production and Preview | yes |
 | `SESSION_SECRET` | `.env.local`, Vercel Production and Preview | yes |
-| `ICAL_URL_ALEX`, `ICAL_URL_MARA` | `.env.local`, Vercel Production and Preview | no, until you copy them from Google Calendar |
+| `ICAL_URL_ALEX` | `.env.local`, Vercel Production and Preview | no, until you copy it from Google Calendar |
 | `ZERNIO_API_KEY` | `.env.local`, Vercel Production and Preview | no, until you have a Zernio key |
 | `ANALYTICS_PROVIDER` and that provider's keys | `.env.local`, Vercel Production and Preview | no, until you choose `plausible`, `umami`, or `ga4` |
 
@@ -111,7 +111,7 @@ Both extensions are enabled on project `xbqcywzbykstjlnrrycl`. The migrations sc
 | `tv-dashboard-calendar` | `*/5 * * * *` | `/api/cron/calendar` |
 | `tv-dashboard-weather` | `*/30 * * * *` | `/api/cron/weather` |
 
-Calendar feeds are `ICAL_URL_ALEX` and `ICAL_URL_MARA`. An empty variable leaves that person's seed events on screen. Weather is Open-Meteo for the place in Config (default Constanța) and needs no key. Site and TikTok screens (and their cron jobs) were removed; `set_metric` can still write arbitrary metric keys if needed.
+The calendar feed is `ICAL_URL_ALEX`. An empty variable leaves Alex's seed events on screen. Weather is Open-Meteo for the place in Config (default Constanța) and needs no key. Site and TikTok screens (and their cron jobs) were removed; `set_metric` can still write arbitrary metric keys if needed.
 
 If the app URL changes, edit the URLs in `supabase/migrations` before `supabase db push`.
 

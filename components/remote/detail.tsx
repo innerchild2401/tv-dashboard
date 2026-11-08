@@ -67,7 +67,8 @@ function Agenda({
   events: { id: string; title: string; start: string; end: string; allDay: boolean; personId: string | null }[];
 }) {
   const [person, setPerson] = useState("all");
-  const shown = events.filter((event) => person === "all" || event.personId === person);
+  const showPeopleFilter = people.length > 1;
+  const shown = events.filter((event) => !showPeopleFilter || person === "all" || event.personId === person);
   const groups = new Map<string, typeof shown>();
   for (const event of shown) {
     const key = formatLongDate(new Date(event.start));
@@ -77,17 +78,19 @@ function Agenda({
   }
   return (
     <div className="stack">
-      <div className="chips">
-        <button type="button" aria-pressed={person === "all"} onClick={() => setPerson("all")}>
-          {ro.remote.filterAll}
-        </button>
-        {people.map((item) => (
-          <button key={item.id} type="button" aria-pressed={person === item.id} onClick={() => setPerson(item.id)}>
-            <span className="dot" style={{ background: item.color }} />
-            {item.name}
+      {showPeopleFilter ? (
+        <div className="chips">
+          <button type="button" aria-pressed={person === "all"} onClick={() => setPerson("all")}>
+            {ro.remote.filterAll}
           </button>
-        ))}
-      </div>
+          {people.map((item) => (
+            <button key={item.id} type="button" aria-pressed={person === item.id} onClick={() => setPerson(item.id)}>
+              <span className="dot" style={{ background: item.color }} />
+              {item.name}
+            </button>
+          ))}
+        </div>
+      ) : null}
       {[...groups.entries()].map(([day, items]) => (
         <section key={day}>
           <h2>{day}</h2>

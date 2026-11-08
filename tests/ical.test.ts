@@ -74,7 +74,7 @@ describe("iCal adapter", () => {
 
   it("rejects a body that is not a calendar and accepts an empty one", () => {
     assert.equal(expandIcal("not a calendar", { personId: "alex", now }).ok, false);
-    const empty = expandIcal("BEGIN:VCALENDAR\nVERSION:2.0\nEND:VCALENDAR\n", { personId: "mara", now });
+    const empty = expandIcal("BEGIN:VCALENDAR\nVERSION:2.0\nEND:VCALENDAR\n", { personId: "alex", now });
     assert.deepEqual(empty, { ok: true, events: [] });
   });
 });

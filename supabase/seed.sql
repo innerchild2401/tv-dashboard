@@ -6,7 +6,7 @@ insert into public.config (id, theme, people, views, profiles, quiet_hours, loca
 values (
   1,
   '{"mode":"dark","accent":"teal","fonts":{"body":"Inter","display":"Space Grotesk"}}'::jsonb,
-  '[{"id":"alex","name":"Alex","color":"#7AA7FF"},{"id":"mara","name":"Mara","color":"#FFB86B"}]'::jsonb,
+  '[{"id":"alex","name":"Alex","color":"#7AA7FF"}]'::jsonb,
   '[
     {"id":"today","enabled":true,"order":1,"dwellSeconds":120,"weight":1},
     {"id":"week","enabled":true,"order":2,"dwellSeconds":120,"weight":1},
@@ -57,11 +57,8 @@ cross join (
     ('22222222-2222-4222-8222-222222222201'::uuid, 'Mic dejun', interval '7 hours 30 minutes', interval '8 hours 15 minutes', 'alex', 'event-breakfast'),
     ('22222222-2222-4222-8222-222222222202'::uuid, 'Întâlnire la birou', interval '9 hours', interval '10 hours 30 minutes', 'alex', 'event-meeting'),
     ('22222222-2222-4222-8222-222222222203'::uuid, 'Prânz', interval '13 hours', interval '13 hours 45 minutes', null, 'event-lunch'),
-    ('22222222-2222-4222-8222-222222222204'::uuid, 'Piață', interval '16 hours 30 minutes', interval '17 hours 30 minutes', 'mara', 'event-market'),
     ('22222222-2222-4222-8222-222222222205'::uuid, 'Cină', interval '19 hours', interval '20 hours', null, 'event-dinner'),
-    ('22222222-2222-4222-8222-222222222206'::uuid, 'Control medical', interval '1 day 10 hours', interval '1 day 10 hours 45 minutes', 'mara', 'event-checkup'),
     ('22222222-2222-4222-8222-222222222207'::uuid, 'Film', interval '1 day 18 hours 30 minutes', interval '1 day 20 hours', 'alex', 'event-film'),
-    ('22222222-2222-4222-8222-222222222208'::uuid, 'Cumpărături', interval '2 days 11 hours', interval '2 days 12 hours 30 minutes', 'mara', 'event-shopping'),
     ('22222222-2222-4222-8222-222222222209'::uuid, 'Plimbare pe faleză', interval '3 days 9 hours 30 minutes', interval '3 days 11 hours', 'alex', 'event-walk')
 ) as rows (id, title, start_offset, end_offset, person_id, external_id);
 
@@ -164,7 +161,6 @@ from (
 cross join (
   values
     ('22222222-2222-4222-8222-222222222210'::uuid, 'Sport', interval '-1 days 18 hours', interval '-1 days 19 hours', 'alex', 'event-sport'),
-    ('22222222-2222-4222-8222-222222222211'::uuid, 'Cafea', interval '-2 days 12 hours', interval '-2 days 13 hours', 'mara', 'event-coffee'),
     ('22222222-2222-4222-8222-222222222212'::uuid, 'Aniversare', interval '10 days 19 hours', interval '10 days 22 hours', null, 'event-anniversary')
 ) as rows (id, title, start_offset, end_offset, person_id, external_id);
 

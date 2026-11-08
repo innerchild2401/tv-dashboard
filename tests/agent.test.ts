@@ -345,7 +345,7 @@ async function routine(store: MemoryStore) {
     { store, now },
   );
   assert.equal(events.ok, true, events.reason);
-  const task = await executeTool("upsert_task", { externalId: "task-2026-11-08", text: "Sună medicul", assignee: "Mara" }, { store, now });
+  const task = await executeTool("upsert_task", { externalId: "task-2026-11-08", text: "Sună medicul", assignee: "Alex" }, { store, now });
   assert.equal(task.ok, true, task.reason);
   const shopping = await executeTool("shopping_add", { items: [{ text: "Lapte", qty: 1, category: "Lactate" }] }, { store, now });
   assert.equal(shopping.ok, true, shopping.reason);
