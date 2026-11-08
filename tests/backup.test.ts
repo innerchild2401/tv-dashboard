@@ -7,6 +7,7 @@ const TABLES = [
   "config",
   "tasks",
   "cards",
+  "spotlights",
   "events",
   "shopping_items",
   "recaps",

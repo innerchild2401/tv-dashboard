@@ -592,6 +592,51 @@ export type Database = {
         }
         Relationships: []
       }
+      spotlights: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          external_id: string | null
+          id: string
+          kind: Database["public"]["Enums"]["spotlight_kind"]
+          locked: boolean
+          note: string | null
+          pinned: boolean
+          source: Database["public"]["Enums"]["source_kind"]
+          starts_at: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          external_id?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["spotlight_kind"]
+          locked?: boolean
+          note?: string | null
+          pinned?: boolean
+          source: Database["public"]["Enums"]["source_kind"]
+          starts_at: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          external_id?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["spotlight_kind"]
+          locked?: boolean
+          note?: string | null
+          pinned?: boolean
+          source?: Database["public"]["Enums"]["source_kind"]
+          starts_at?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       tasks: {
         Row: {
           assignee_id: string | null
@@ -653,6 +698,7 @@ export type Database = {
         | "note"
       inbox_status: "new" | "routed" | "needs_review"
       source_kind: "manual" | "assistant" | "integration"
+      spotlight_kind: "trip" | "competition" | "deadline" | "other"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -792,6 +838,7 @@ export const Constants = {
       ],
       inbox_status: ["new", "routed", "needs_review"],
       source_kind: ["manual", "assistant", "integration"],
+      spotlight_kind: ["trip", "competition", "deadline", "other"],
     },
   },
 } as const

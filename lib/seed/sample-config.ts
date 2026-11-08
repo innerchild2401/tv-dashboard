@@ -14,7 +14,7 @@ export const sampleConfig = {
   views: [
     { id: "today" as ViewId, enabled: true, order: 1, dwellSeconds: 45, weight: 3 },
     { id: "week" as ViewId, enabled: true, order: 2, dwellSeconds: 45, weight: 2 },
-    { id: "month" as ViewId, enabled: true, order: 3, dwellSeconds: 45, weight: 1 },
+    { id: "momente" as ViewId, enabled: true, order: 3, dwellSeconds: 45, weight: 1 },
     { id: "site" as ViewId, enabled: true, order: 4, dwellSeconds: 45, weight: 1 },
     { id: "tiktok" as ViewId, enabled: true, order: 5, dwellSeconds: 45, weight: 1 },
     { id: "vision" as ViewId, enabled: true, order: 6, dwellSeconds: 45, weight: 1 },
@@ -38,7 +38,7 @@ export const sampleConfig = {
       views: [
         { id: "today", weight: 3, dwellSeconds: 45 },
         { id: "week", weight: 2, dwellSeconds: 45 },
-        { id: "month", weight: 1, dwellSeconds: 45 },
+        { id: "momente", weight: 1, dwellSeconds: 45 },
         { id: "home", weight: 1, dwellSeconds: 45 },
         { id: "vision", weight: 1, dwellSeconds: 45 },
       ],

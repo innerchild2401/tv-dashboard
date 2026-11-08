@@ -1,5 +1,5 @@
 import type { ViewId } from "@/i18n/ro";
-import type { DashboardConfig, SnapshotEvent, SnapshotShopping, SnapshotTask } from "@/lib/state/types";
+import type { DashboardConfig, SnapshotEvent, SnapshotShopping, SnapshotSpotlight, SnapshotTask } from "@/lib/state/types";
 import type { HoldMode } from "@/lib/remote/hold";
 
 export type CardKind = "photo" | "affirmation" | "countdown" | "word" | "progress" | "wins" | "recap" | "note";
@@ -45,6 +45,7 @@ export type RemoteBoard = {
   shopping: SnapshotShopping[];
   inbox: InboxRow[];
   events: SnapshotEvent[];
+  spotlights: SnapshotSpotlight[];
   metrics: { key: string; value: number; previous: number | null }[];
   realtime: { url: string; anonKey: string; channel: string } | null;
   photoUpload: "signed" | "direct";

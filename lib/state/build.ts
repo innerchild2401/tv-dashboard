@@ -4,8 +4,9 @@ import { accentColor } from "@/lib/theme/accent";
 import { peekNextView } from "@/lib/rotation/engine";
 import { activePriority, evaluateRules, rotationPool } from "@/lib/rotation/rules";
 import { viewCandidates } from "@/lib/state/availability";
-import { projectWeek, projectMonth } from "@/lib/views/calendar";
+import { projectWeek } from "@/lib/views/calendar";
 import { projectHome, projectVision } from "@/lib/views/household";
+import { projectMomente } from "@/lib/views/momente";
 import { projectSite, projectTikTok } from "@/lib/views/metrics";
 import { CALENDAR_INTERVAL_MS, WEATHER_INTERVAL_MS } from "@/lib/adapters/intervals";
 import { updatedLabel } from "@/lib/format/display";
@@ -72,7 +73,7 @@ export function buildTvState(
   const empty = {
     today: null,
     week: null,
-    month: null,
+    momente: null,
     site: null,
     tiktok: null,
     vision: null,
@@ -113,7 +114,7 @@ export function buildTvState(
     ...empty,
     today: visible === "today" ? { ...todayBody(today), updatedLabel: calendarNote } : null,
     week: visible === "week" ? { ...projectWeek(snapshot, now), updatedLabel: calendarNote } : null,
-    month: visible === "month" ? { ...projectMonth(snapshot, now), updatedLabel: calendarNote } : null,
+    momente: visible === "momente" ? projectMomente(snapshot, now) : null,
     site: visible === "site" ? withCelebration(projectSite(snapshot, now), smart.celebrations, "site") : null,
     tiktok: visible === "tiktok" ? withCelebration(projectTikTok(snapshot, now), smart.celebrations, "tiktok") : null,
     vision: visible === "vision" ? projectVision(snapshot, now, celebrationText(smart.celebrations, "vision")) : null,

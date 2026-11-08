@@ -6,6 +6,8 @@ export const TOOL_NAMES = [
   "get_schema",
   "upsert_card",
   "delete_card",
+  "upsert_spotlight",
+  "delete_spotlight",
   "set_recap",
   "set_priority",
   "get_inbox",
@@ -25,6 +27,7 @@ export const RATE_LIMIT = 60;
 
 export type Source = "manual" | "assistant" | "integration";
 export type CardKind = "photo" | "affirmation" | "countdown" | "word" | "progress" | "wins" | "recap" | "note";
+export type SpotlightKind = "trip" | "competition" | "deadline" | "other";
 export type Palette = "sand" | "coral" | "lilac" | "mint" | "sky" | "pink";
 export type InboxStatus = "new" | "routed" | "needs_review";
 
@@ -154,6 +157,19 @@ export type MetricRecord = {
   deletedAt: string | null;
 };
 
+export type SpotlightRecord = {
+  id: string;
+  title: string;
+  kind: SpotlightKind;
+  startsAt: string;
+  note: string | null;
+  pinned: boolean;
+  source: Source;
+  locked: boolean;
+  externalId: string | null;
+  deletedAt: string | null;
+};
+
 export type UndoBody = {
   cards?: CardRecord[];
   events?: EventRecord[];
@@ -164,7 +180,10 @@ export type UndoBody = {
   inbox?: InboxRecord[];
   ideas?: IdeaRecord[];
   metrics?: MetricRecord[];
-  drop?: Partial<Record<"cards" | "events" | "tasks" | "shopping" | "recaps" | "priorities" | "inbox" | "ideas" | "metrics", string[]>>;
+  spotlights?: SpotlightRecord[];
+  drop?: Partial<
+    Record<"cards" | "events" | "tasks" | "shopping" | "recaps" | "priorities" | "inbox" | "ideas" | "metrics" | "spotlights", string[]>
+  >;
   control?: DisplayControl;
   expectControl?: DisplayControl;
 };
@@ -217,6 +236,8 @@ export interface AgentStore {
   putIdea(row: IdeaRecord): Promise<void>;
   metrics(): Promise<MetricRecord[]>;
   putMetric(row: MetricRecord): Promise<void>;
+  spotlights(): Promise<SpotlightRecord[]>;
+  putSpotlight(row: SpotlightRecord): Promise<void>;
   control(): Promise<DisplayControl>;
   putControl(control: DisplayControl): Promise<void>;
   saveImage(bytes: Uint8Array, type: ImageKind): Promise<string>;

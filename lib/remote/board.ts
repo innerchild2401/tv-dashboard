@@ -26,6 +26,7 @@ export async function loadRemoteBoard(now = new Date()): Promise<RemoteBoard> {
     shopping: snapshot.shopping,
     inbox,
     events: snapshot.events,
+    spotlights: snapshot.spotlights,
     metrics: snapshot.metrics.map(({ key, value, previous }) => ({ key, value, previous })),
     realtime: realtimeClientConfig(),
     photoUpload: databaseConfigured() ? "signed" : "direct",

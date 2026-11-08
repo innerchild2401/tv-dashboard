@@ -6,12 +6,21 @@ export const ro = {
   views: {
     today: "Azi",
     week: "Săptămână",
-    month: "Lună",
+    momente: "Momente",
     site: "Site",
     tiktok: "TikTok",
     vision: "Vision board",
     home: "Acasă",
   },
+  momenteEmpty: "Niciun moment apropiat",
+  momenteMore: "mai multe",
+  spotlightKinds: {
+    trip: "Călătorie",
+    competition: "Competiție",
+    deadline: "Termen",
+    other: "Altele",
+  },
+  momenteDone: "Gata",
   now: "Acum",
   todayLead: "Azi",
   tomorrowLead: "Mâine",
@@ -241,6 +250,8 @@ export const ro = {
     tools: {
       upsert_card: "Card",
       delete_card: "Ștergere card",
+      upsert_spotlight: "Moment",
+      delete_spotlight: "Ștergere moment",
       set_recap: "Rezumat",
       set_priority: "Prioritate",
       route_inbox_item: "Inbox",
@@ -270,7 +281,7 @@ export function attemptsLeft(count: number): string {
 
 export type ViewId = keyof typeof ro.views;
 
-export const VIEW_IDS: ViewId[] = ["today", "week", "month", "site", "tiktok", "vision", "home"];
+export const VIEW_IDS: ViewId[] = ["today", "week", "momente", "site", "tiktok", "vision", "home"];
 
 export function rotationReason(id: ViewId, weight: number): string {
   return `${ro.views[id]} · ${ro.weight} ${weight}`;

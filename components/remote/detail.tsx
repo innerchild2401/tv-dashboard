@@ -20,7 +20,8 @@ export function Detail({ view }: { view: string }) {
     <section className="stack">
       <a href="/remote">{ro.remote.back}</a>
       <h1>{ro.views[id]}</h1>
-      {id === "today" || id === "week" || id === "month" ? <Agenda people={board.config.people} events={board.events} /> : null}
+      {id === "today" || id === "week" ? <Agenda people={board.config.people} events={board.events} /> : null}
+      {id === "momente" ? <MomenteList spotlights={board.spotlights} /> : null}
       {id === "site" ? <MetricList metrics={board.metrics} prefix="site." title={ro.remote.pages} /> : null}
       {id === "tiktok" ? <MetricList metrics={board.metrics} prefix="tiktok." title={ro.remote.videos} /> : null}
       {id === "vision" ? (
@@ -102,6 +103,26 @@ function Agenda({
         </section>
       ))}
     </div>
+  );
+}
+
+function MomenteList({
+  spotlights,
+}: {
+  spotlights: { id: string; title: string; kind: string; startsAt: string; note: string | null; pinned: boolean }[];
+}) {
+  if (spotlights.length === 0) {
+    return <p>{ro.momenteEmpty}</p>;
+  }
+  return (
+    <ul className="plain-list">
+      {spotlights.map((item) => (
+        <li key={item.id}>
+          {ro.spotlightKinds[item.kind as keyof typeof ro.spotlightKinds] ?? item.kind} · {item.title}
+          {item.note ? ` — ${item.note}` : ""}
+        </li>
+      ))}
+    </ul>
   );
 }
 

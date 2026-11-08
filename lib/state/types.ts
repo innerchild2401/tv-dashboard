@@ -46,6 +46,17 @@ export type SnapshotCard = {
   photoUrl?: string | null;
 };
 
+export type SpotlightKind = "trip" | "competition" | "deadline" | "other";
+
+export type SnapshotSpotlight = {
+  id: string;
+  title: string;
+  kind: SpotlightKind;
+  startsAt: string;
+  note: string | null;
+  pinned: boolean;
+};
+
 export type SnapshotMetric = {
   key: string;
   value: number;
@@ -77,6 +88,7 @@ export type Snapshot = {
   tasks: SnapshotTask[];
   shopping: SnapshotShopping[];
   cards: SnapshotCard[];
+  spotlights: SnapshotSpotlight[];
   recap: SnapshotRecap | null;
   priorities: SnapshotPriority[];
   metrics: SnapshotMetric[];
@@ -131,6 +143,29 @@ export type MonthModel = {
     extra: number;
   }[];
   updatedLabel: string | null;
+};
+
+export type MomenteLayout = "empty" | "solo" | "split" | "tiles" | "dense" | "overflow";
+
+export type MomenteItem = {
+  id: string;
+  title: string;
+  kind: SpotlightKind;
+  kindLabel: string;
+  note: string | null;
+  pinned: boolean;
+  days: number;
+  daysLabel: string;
+  unitLabel: string | null;
+  today: boolean;
+};
+
+export type MomenteModel = {
+  title: string;
+  layout: MomenteLayout;
+  items: MomenteItem[];
+  hidden: number;
+  emptyLabel: string;
 };
 
 export type StatModel = { label: string; value: string; delta: string | null };
@@ -197,7 +232,7 @@ export type TvState = {
   chrome: ChromeModel;
   today: TodayModel | null;
   week: WeekModel | null;
-  month: MonthModel | null;
+  momente: MomenteModel | null;
   site: SiteModel | null;
   tiktok: TikTokModel | null;
   vision: VisionModel | null;

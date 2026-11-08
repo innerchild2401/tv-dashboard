@@ -19,6 +19,8 @@ import {
   type RecapRecord,
   type ShoppingRecord,
   type Source,
+  type SpotlightKind,
+  type SpotlightRecord,
   type TaskRecord,
   type ToolName,
   type ToolResult,
@@ -154,12 +156,46 @@ const pinInput = z.object({
 const undoInput = z.object({
   id: z.string().uuid().optional(),
 });
+const spotlightInput = z.object({
+  externalId: z.string().trim().min(1).max(200),
+  title: z.string().trim().min(1).max(200),
+  kind: z.enum(["trip", "competition", "deadline", "other"]).optional(),
+  startsAt: z.string().min(8).max(40),
+  note: z.string().max(500).nullable().optional(),
+  pinned: z.boolean().optional(),
+});
 
 export const TOOL_CATALOG: { name: ToolName; title: string; description: string; input: z.ZodType }[] = [
-  { name: "get_dashboard_state", title: "Dashboard state", description: "Read views, cards, lists, today's events, the recap and the priority before writing.", input: emptyInput },
-  { name: "get_schema", title: "Card schema", description: "Return the JSON schema of every card kind and the palette tokens.", input: emptyInput },
+  {
+    name: "get_dashboard_state",
+    title: "Dashboard state",
+    description:
+      "Read views, cards, Momente spotlights, lists, today's events, the recap and the priority before writing. Spotlights power the Momente TV view (view id momente).",
+    input: emptyInput,
+  },
+  {
+    name: "get_schema",
+    title: "Schemas for Grokbot",
+    description:
+      "Return card schemas, palette tokens, and the Momente spotlight contract: kinds trip|competition|deadline|other, startsAt ISO instant (countdown = whole Europe/Bucharest calendar days until that date; 0 = azi), Romanian titles ok, tools upsert_spotlight and delete_spotlight with examples.",
+    input: emptyInput,
+  },
   { name: "upsert_card", title: "Upsert card", description: "Create or update a card. The same externalId updates the existing card. A manual or locked card is refused. A win or progress card needs evidence.", input: cardInput },
   { name: "delete_card", title: "Delete card", description: "Soft-delete a card the assistant owns. Pass id or externalId.", input: deleteInput },
+  {
+    name: "upsert_spotlight",
+    title: "Upsert Momente spotlight",
+    description:
+      "Create or update a Momente countdown. Params: externalId (stable key), title (Romanian ok, e.g. Vacanță la munte), kind (trip=Călătorie, competition=Competiție, deadline=Termen, other=Altele; default other), startsAt (ISO date/time; day countdown in Europe/Bucharest), note (optional), pinned (optional bool — pinned stay on screen when overflow). Same externalId updates. Example: {\"externalId\":\"trip-ski-2027\",\"title\":\"Vacanță la munte\",\"kind\":\"trip\",\"startsAt\":\"2027-01-12T08:00:00+02:00\",\"pinned\":true}. Past days are hidden on TV. Soft-deleted via delete_spotlight.",
+    input: spotlightInput,
+  },
+  {
+    name: "delete_spotlight",
+    title: "Delete Momente spotlight",
+    description:
+      "Soft-delete an assistant-owned Momente spotlight. Pass id (uuid) or externalId. Example: {\"externalId\":\"trip-ski-2027\"}. Locked/manual rows are refused.",
+    input: deleteInput,
+  },
   { name: "set_recap", title: "Daily recap", description: "Replace the assistant's daily recap text and recap card. Use a stable externalId such as recap-2026-11-08.", input: recapInput },
   { name: "set_priority", title: "Priority", description: "Set the one priority for today. A reason is required. A manual priority always wins.", input: priorityInput },
   { name: "get_inbox", title: "Inbox", description: "List inbox items that are not routed yet. Pass status to filter.", input: inboxInput },
@@ -169,7 +205,12 @@ export const TOOL_CATALOG: { name: ToolName; title: string; description: string;
   { name: "shopping_add", title: "Add shopping", description: "Add shopping items, merging duplicates by name. A second run does not create another row or add the quantity again.", input: shoppingInput },
   { name: "shopping_check", title: "Check shopping", description: "Check or uncheck shopping items the assistant owns.", input: checkInput },
   { name: "set_metric", title: "Set metric", description: "Set a metric the integrations cannot fetch. A manual metric is left unchanged.", input: metricInput },
-  { name: "pin_view", title: "Pin view", description: "Show a view for at most 30 minutes. This cannot lock the screen or change config.", input: pinInput },
+  {
+    name: "pin_view",
+    title: "Pin view",
+    description: "Show a view for at most 30 minutes. View ids include momente (Momente countdowns). This cannot lock the screen or change config.",
+    input: pinInput,
+  },
   { name: "undo", title: "Undo", description: "Restore the previous state of the latest assistant write, or of one of the last 50. A later manual edit is kept.", input: undoInput },
 ];
 
@@ -229,6 +270,8 @@ async function dispatch(store: AgentStore, name: ToolName, args: unknown, now: D
   if (name === "get_schema") return schemaOf();
   if (name === "upsert_card") return upsertCard(store, args, now, fetchImage);
   if (name === "delete_card") return deleteCard(store, args, now);
+  if (name === "upsert_spotlight") return upsertSpotlight(store, args);
+  if (name === "delete_spotlight") return deleteSpotlight(store, args, now);
   if (name === "set_recap") return setRecap(store, args, now);
   if (name === "set_priority") return setPriority(store, args, now);
   if (name === "get_inbox") return listInbox(store, args);
@@ -243,7 +286,7 @@ async function dispatch(store: AgentStore, name: ToolName, args: unknown, now: D
 }
 
 async function stateOf(store: AgentStore, now: Date): Promise<Outcome> {
-  const [views, people, cards, events, tasks, shopping, recaps, priorities, inbox, metrics] = await Promise.all([
+  const [views, people, cards, events, tasks, shopping, recaps, priorities, inbox, metrics, spotlights] = await Promise.all([
     store.views(),
     store.people(),
     store.cards(),
@@ -254,6 +297,7 @@ async function stateOf(store: AgentStore, now: Date): Promise<Outcome> {
     store.priorities(),
     store.inbox(),
     store.metrics(),
+    store.spotlights(),
   ]);
   const parts = zonedParts(now);
   const start = zonedTimeToUtc({ ...parts, hour: 0, minute: 0 }).getTime();
@@ -266,6 +310,7 @@ async function stateOf(store: AgentStore, now: Date): Promise<Outcome> {
         views,
         people,
         cards: active(cards).map(publicCard),
+        spotlights: active(spotlights).map(publicSpotlight),
         tasks: active(tasks).map(publicTask),
         shopping: active(shopping).map(publicShopping),
         eventsToday: active(events).filter((event) => new Date(event.endsAt).getTime() > start && new Date(event.startsAt).getTime() < end),
@@ -297,11 +342,51 @@ function schemaOf(): Outcome {
       schema: {
         palette: ACCENT_CHOICES.filter((choice) => paletteTokenSchema.safeParse(choice.id).success),
         cards,
+        momente: {
+          viewId: "momente",
+          labelRo: "Momente",
+          replaces: "month / Lună",
+          description:
+            "TV spotlight countdowns. Countdown = whole calendar days until startsAt in Europe/Bucharest. 0 means azi. Past items are hidden. Empty Momente is skipped in rotation.",
+          kinds: [
+            { id: "trip", labelRo: "Călătorie" },
+            { id: "competition", labelRo: "Competiție" },
+            { id: "deadline", labelRo: "Termen" },
+            { id: "other", labelRo: "Altele" },
+          ],
+          tools: {
+            upsert_spotlight: {
+              params: {
+                externalId: "string, required, stable idempotency key",
+                title: "string, required, Romanian titles ok",
+                kind: "trip | competition | deadline | other (default other)",
+                startsAt: "ISO date/time string, required",
+                note: "optional string or null",
+                pinned: "optional boolean — keep when more than 6 spotlights",
+              },
+              example: {
+                externalId: "trip-ski-2027",
+                title: "Vacanță la munte",
+                kind: "trip",
+                startsAt: "2027-01-12T08:00:00+02:00",
+                note: "Plecare dimineața",
+                pinned: true,
+              },
+            },
+            delete_spotlight: {
+              params: { id: "uuid optional", externalId: "string optional — pass one of them" },
+              example: { externalId: "trip-ski-2027" },
+            },
+          },
+          clearSamples:
+            "Seeded sample external ids: spotlight-vacanta-sample, spotlight-deadline-sample. Call delete_spotlight on those to clear Cast samples.",
+        },
         rules: [
           "A win or progress item needs evidence such as task:done:<id>, event:<id> or metric:tiktok.posts.",
           "The same externalId updates the existing row, so a daily routine can run twice.",
           "A manual or locked row is left unchanged.",
           "A priority needs a reason and expires at the end of the day unless another time is given.",
+          "Momente spotlights use upsert_spotlight / delete_spotlight. Day countdown is Bucharest calendar days, not hours.",
         ],
       },
     }),
@@ -398,6 +483,46 @@ async function deleteCard(store: AgentStore, args: unknown, now: Date): Promise<
   if (locked) return no(locked);
   await store.putCard({ ...existing, deletedAt: now.toISOString() });
   return done(success(existing.id), { cards: [copy(existing)] });
+}
+
+async function upsertSpotlight(store: AgentStore, args: unknown): Promise<Outcome> {
+  const input = read(spotlightInput, args);
+  if (!input.ok) return input.outcome;
+  const startsAt = parseInstant(input.value.startsAt);
+  if (!startsAt) return no("startsAt must be a date and time");
+  const rows = await store.spotlights();
+  const existing = rows.find((row) => row.externalId === input.value.externalId) ?? null;
+  const locked = handLock(existing, "spotlight");
+  if (locked) return no(locked);
+  const kind = (input.value.kind ?? existing?.kind ?? "other") as SpotlightKind;
+  const row: SpotlightRecord = {
+    id: existing?.id ?? crypto.randomUUID(),
+    title: input.value.title,
+    kind,
+    startsAt,
+    note: input.value.note === undefined ? (existing?.note ?? null) : input.value.note,
+    pinned: input.value.pinned ?? existing?.pinned ?? false,
+    source: "assistant",
+    locked: false,
+    externalId: input.value.externalId,
+    deletedAt: null,
+  };
+  await store.putSpotlight(row);
+  return done(success(row.id), existing ? { spotlights: [copy(existing)] } : { drop: { spotlights: [row.id] } });
+}
+
+async function deleteSpotlight(store: AgentStore, args: unknown, now: Date): Promise<Outcome> {
+  const input = read(deleteInput, args);
+  if (!input.ok) return input.outcome;
+  if (!input.value.id && !input.value.externalId) return no("id or externalId is required");
+  const rows = await store.spotlights();
+  const existing = rows.find((row) => row.id === input.value.id || row.externalId === input.value.externalId) ?? null;
+  if (!existing) return no("that spotlight was not found");
+  if (existing.deletedAt) return done(success(existing.id, ["already removed"]), null);
+  const locked = handLock(existing, "spotlight");
+  if (locked) return no(locked);
+  await store.putSpotlight({ ...existing, deletedAt: now.toISOString() });
+  return done(success(existing.id), { spotlights: [copy(existing)] });
 }
 
 async function setRecap(store: AgentStore, args: unknown, now: Date): Promise<Outcome> {
@@ -908,6 +1033,7 @@ async function handKeeps(store: AgentStore, body: UndoBody): Promise<string | nu
     [store.priorities(), idsOf(body.priorities, body.drop?.priorities)],
     [store.ideas(), idsOf(body.ideas, body.drop?.ideas)],
     [store.metrics(), idsOf(body.metrics, body.drop?.metrics)],
+    [store.spotlights(), idsOf(body.spotlights, body.drop?.spotlights)],
   ];
   for (const [loaded, ids] of checks) {
     if (ids.length === 0) continue;
@@ -1027,6 +1153,20 @@ function publicCard(card: CardRecord) {
     locked: card.locked,
     expiresAt: card.expiresAt,
     data: card.data,
+  };
+}
+
+function publicSpotlight(row: SpotlightRecord) {
+  return {
+    id: row.id,
+    externalId: row.externalId,
+    title: row.title,
+    kind: row.kind,
+    startsAt: row.startsAt,
+    note: row.note,
+    pinned: row.pinned,
+    source: row.source,
+    locked: row.locked,
   };
 }
 
