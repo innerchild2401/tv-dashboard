@@ -5,11 +5,11 @@ import { memoryPhoto } from "@/lib/remote/memory";
 const BUCKET = "photos";
 
 export function isPhotoPath(path: string): boolean {
-  return /^(phone|memory)\/[0-9a-f-]{36}\.(jpg|png|webp|gif)$/.test(path);
+  return /^(phone|memory|agent)\/[0-9a-f-]{36}\.(jpg|png|webp|gif)$/.test(path);
 }
 
 export async function signPhotoMap(paths: string[]): Promise<Map<string, string>> {
-  const unique = [...new Set(paths.filter((path) => path.startsWith("phone/")))];
+  const unique = [...new Set(paths.filter((path) => path.startsWith("phone/") || path.startsWith("agent/")))];
   if (!databaseConfigured() || unique.length === 0) return new Map();
   const supabase = createServiceClient();
   const { data, error } = await supabase.storage.from(BUCKET).createSignedUrls(unique, 60 * 60 * 2);

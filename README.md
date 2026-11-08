@@ -1,6 +1,6 @@
 # Tablou TV
 
-A self-hosted dashboard for a Chromecast. One Next.js app serves the TV page, the phone remote, and the API. Supabase holds the data. Vercel hosts the app. The assistant endpoint is not wired yet.
+A self-hosted dashboard for a Chromecast. One Next.js app serves the TV page, the phone remote, and the API. Supabase holds the data. Vercel hosts the app. Grokbot writes through `/mcp` or `POST /api/agent/<tool>` with the `AGENT_TOKEN` bearer token.
 
 The TV page renders seven screens from the sample seed: Today, Week, Month, Site, TikTok, Vision board and Home. `/api/state` chooses the screen. Rotation uses each view's weight and dwell, skips an empty view, and gives Today's weight to Week when today has no events. A content-free Realtime broadcast asks the TV to refetch; it also polls every 30 seconds. A failed refetch leaves the last screen up. The page reloads itself once, around 04:00 Europe/Bucharest. Quiet hours, interrupts and time-of-day profiles are not applied yet. TikTok and analytics keys are not wired.
 
@@ -58,7 +58,11 @@ Calendar and weather refresh from `/api/cron/calendar` (every 5 minutes) and `/a
 
 ## Daily routine contract
 
-Grokbot is not wired up yet (M4). When it is, a run calls `get_dashboard_state`, then `set_recap`, then `upsert_card` for the affirmation, weekly wins and word of the month, then `upsert_events`, `upsert_task` and `shopping_add`, all with stable `externalId` values such as `recap-2026-11-08`. The same handlers will exist as `POST /api/agent/<tool>`.
+Grokbot calls the MCP server at `/mcp` (stateless Streamable HTTP, tools only). The same handlers are `POST /api/agent/<tool>`. Send `Authorization: Bearer` with `AGENT_TOKEN`. The token cannot change config, the PIN, or other tokens. The assistant can pin a view for at most 30 minutes and cannot lock the screen.
+
+A run calls `get_dashboard_state`, then `get_inbox` and `route_inbox_item` for anything still waiting, then `set_recap`, then `set_priority`, then `upsert_card` for the affirmation, weekly wins and word of the month, then `upsert_events`, `upsert_task` and `shopping_add`. Use stable ids such as `recap-2026-11-08`, `affirmation-2026-11-08`, `wins-2026-11-08` and `word-2026-11-08`. The same id updates the existing row, so the routine can run twice.
+
+A manual or locked row is left unchanged. A priority needs a one-line reason and expires at the end of the day in Europe/Bucharest unless another time is sent. A manual priority wins. `route_inbox_item` creates an event only when the text has a date and a time; otherwise it creates a task, or leaves the item as needs review when the destination is unclear. A win or progress card needs `evidence` such as `task:done:<id>`. Every call is written to `audit_log`. `undo` restores one of the last 50 assistant writes, and it refuses when a later manual edit is holding that row. The phone's system page, where those undos will also appear, is not part of this milestone. Sixty calls per minute are counted in Postgres.
 
 ## Later
 

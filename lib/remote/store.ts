@@ -196,7 +196,11 @@ export async function deleteCard(id: string, now: Date): Promise<{ ok: true } | 
     return memoryDeleteCard(id, now) ? { ok: true } : { ok: false, reason: ro.remote.missing };
   }
   const supabase = createServiceClient();
-  const { error } = await supabase.from("cards").update({ deleted_at: now.toISOString() }).eq("id", id).is("deleted_at", null);
+  const { error } = await supabase
+    .from("cards")
+    .update({ deleted_at: now.toISOString(), source: "manual", locked: true })
+    .eq("id", id)
+    .is("deleted_at", null);
   if (error) return { ok: false, reason: ro.remote.unavailable };
   return { ok: true };
 }
@@ -524,7 +528,12 @@ async function softDelete(
     return memoryDelete(id, now) ? { ok: true } : { ok: false, reason: ro.remote.missing };
   }
   const supabase = createServiceClient();
-  const { error } = await supabase.from(table).update({ deleted_at: now.toISOString() }).eq("id", id).is("deleted_at", null);
+  const deletedAt = now.toISOString();
+  const result =
+    table === "inbox_items"
+      ? await supabase.from(table).update({ deleted_at: deletedAt }).eq("id", id).is("deleted_at", null)
+      : await supabase.from(table).update({ deleted_at: deletedAt, source: "manual", locked: true }).eq("id", id).is("deleted_at", null);
+  const { error } = result;
   if (error) return { ok: false, reason: ro.remote.unavailable };
   return { ok: true };
 }

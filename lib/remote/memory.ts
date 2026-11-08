@@ -177,6 +177,8 @@ export function memoryDeleteCard(id: string, now: Date): boolean {
   const card = ensureMemory().cards.find((item) => item.id === id && !item.deletedAt);
   if (!card) return false;
   card.deletedAt = now.toISOString();
+  card.source = "manual";
+  card.locked = true;
   return true;
 }
 
@@ -207,6 +209,8 @@ export function memoryDeleteTask(id: string, now: Date): boolean {
   const task = ensureMemory().tasks.find((item) => item.id === id && !item.deletedAt);
   if (!task) return false;
   task.deletedAt = now.toISOString();
+  task.source = "manual";
+  task.locked = true;
   return true;
 }
 
@@ -229,6 +233,8 @@ export function memoryDeleteShopping(id: string, now: Date): boolean {
   const item = ensureMemory().shopping.find((row) => row.id === id && !row.deletedAt);
   if (!item) return false;
   item.deletedAt = now.toISOString();
+  item.source = "manual";
+  item.locked = true;
   return true;
 }
 

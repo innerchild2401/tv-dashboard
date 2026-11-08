@@ -15,8 +15,10 @@
     "gen:types": "supabase gen types typescript --linked --schema public > lib/db/database.types.ts"
   },
   "dependencies": {
+    "@modelcontextprotocol/server": "2.4.0",
     "@supabase/realtime-js": "2.119.0",
     "@supabase/supabase-js": "^2.119.0",
+    "mcp-handler": "2.3.1",
     "next": "16.4.5",
     "node-ical": "0.20.1",
     "react": "19.3.0",
