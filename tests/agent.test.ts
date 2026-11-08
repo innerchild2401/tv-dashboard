@@ -236,6 +236,87 @@ describe("agent transport", () => {
   });
 });
 
+describe("vision photo cards", () => {
+  it("stores an https image on a photo card and documents it in get_schema", async () => {
+    const store = new MemoryStore();
+    const png = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0, 0, 0, 0, 0, 0, 0, 0]);
+    const saved = await executeTool(
+      "upsert_card",
+      {
+        externalId: "photo-vacanta-2026",
+        viewId: "vision",
+        kind: "photo",
+        title: "Vacanță",
+        image_url: "https://cdn.example/vacation.png",
+        data: { alt: "Familie la munte" },
+      },
+      {
+        store,
+        now,
+        fetchImage: async () => ({ ok: true, bytes: png, type: "image/png" }),
+      },
+    );
+    assert.equal(saved.ok, true, saved.reason);
+    const card = (await store.cards()).find((item) => item.externalId === "photo-vacanta-2026");
+    assert.equal(card?.kind, "photo");
+    assert.equal(card?.title, "Vacanță");
+    assert.match(String(card?.data.storagePath ?? ""), /^memory\/.+\.png$/);
+    assert.equal(card?.data.alt, "Familie la munte");
+
+    const httpOnly = await executeTool(
+      "upsert_card",
+      { externalId: "photo-http", kind: "photo", image_url: "http://cdn.example/a.png" },
+      { store, now, fetchImage: async () => ({ ok: true, bytes: png, type: "image/png" }) },
+    );
+    assert.equal(httpOnly.ok, false);
+    assert.match(httpOnly.reason ?? "", /https/i);
+
+    const wrongKind = await executeTool(
+      "upsert_card",
+      { externalId: "note-with-image", kind: "note", title: "Nu", image_url: "https://cdn.example/a.png" },
+      { store, now, fetchImage: async () => ({ ok: true, bytes: png, type: "image/png" }) },
+    );
+    assert.equal(wrongKind.ok, false);
+    assert.match(wrongKind.reason ?? "", /only for a photo card/);
+
+    const notImage = await executeTool(
+      "upsert_card",
+      { externalId: "photo-bad", kind: "photo", image_url: "https://cdn.example/a.txt" },
+      { store, now, fetchImage: async () => ({ ok: false, reason: "image type is not a photo" }) },
+    );
+    assert.equal(notImage.ok, false);
+    assert.match(notImage.reason ?? "", /not a photo/);
+
+    const schema = await executeTool("get_schema", {}, { store, now });
+    assert.equal(schema.ok, true);
+    const photos = (schema.schema as { photos?: { labelRo?: string; example?: { image_url?: string } } })?.photos;
+    assert.equal(photos?.labelRo, "Victorii");
+    assert.match(photos?.example?.image_url ?? "", /^https:\/\//);
+  });
+
+  it("keeps an existing photo when image_url is omitted on update", async () => {
+    const store = new MemoryStore();
+    const png = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0, 0, 0, 0, 0, 0, 0, 0]);
+    await executeTool(
+      "upsert_card",
+      { externalId: "photo-keep", kind: "photo", title: "Una", image_url: "https://cdn.example/one.png" },
+      { store, now, fetchImage: async () => ({ ok: true, bytes: png, type: "image/png" }) },
+    );
+    const first = (await store.cards()).find((item) => item.externalId === "photo-keep");
+    const path = first?.data.storagePath;
+    assert.ok(typeof path === "string");
+    const again = await executeTool(
+      "upsert_card",
+      { externalId: "photo-keep", kind: "photo", title: "Două" },
+      { store, now },
+    );
+    assert.equal(again.ok, true, again.reason);
+    const second = (await store.cards()).find((item) => item.externalId === "photo-keep");
+    assert.equal(second?.title, "Două");
+    assert.equal(second?.data.storagePath, path);
+  });
+});
+
 describe("image addresses and appointments", () => {
   it("blocks private addresses before fetching", async () => {
     assert.equal(isBlockedAddress("127.0.0.1"), true);

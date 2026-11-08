@@ -23,11 +23,15 @@ export function VisionView({ view }: { view: VisionModel }) {
 
 function CardBody({ card }: { card: VisionCardModel }) {
   if (card.kind === "photo" && card.photoUrl) {
+    const caption = card.title ?? card.body ?? ro.photo;
     return (
-      <>
-        <img src={card.photoUrl} alt={card.title ?? card.body ?? ro.photo} />
-        {card.title ? <p className="card-kicker">{card.title}</p> : null}
-      </>
+      <div className="photo-frame">
+        <span className="photo-tape" aria-hidden="true" />
+        <div className="photo-mat">
+          <img src={card.photoUrl} alt={caption} />
+        </div>
+        <p className="photo-caption">{caption}</p>
+      </div>
     );
   }
   if (card.kind === "affirmation") {

@@ -7,7 +7,7 @@ export const ro = {
     today: "Azi",
     week: "Săptămână",
     momente: "Momente",
-    vision: "Vision board",
+    vision: "Victorii",
     home: "Acasă",
   },
   momenteEmpty: "Niciun moment apropiat",

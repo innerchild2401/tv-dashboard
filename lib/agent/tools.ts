@@ -50,15 +50,21 @@ const KIND_COLOR: Record<CardKind, Palette> = {
 
 const emptyInput = z.object({});
 const cardInput = z.object({
-  externalId: z.string().trim().min(1).max(200),
-  viewId: z.string().trim().min(1).max(40).optional(),
+  externalId: z.string().trim().min(1).max(200).describe("Stable idempotency key. The same value updates the existing card."),
+  viewId: z.string().trim().min(1).max(40).optional().describe('Defaults to "vision" (Victorii / vision board).'),
   kind: z.enum(["photo", "affirmation", "countdown", "word", "progress", "wins", "recap", "note"]),
   title: z.string().max(200).optional(),
   body: z.string().max(500).optional(),
   color: paletteTokenSchema.optional(),
-  data: z.record(z.string(), z.unknown()).optional(),
+  data: z.record(z.string(), z.unknown()).optional().describe("Kind-specific fields. For photo cards use data.alt; storagePath is set server-side."),
   expiresAt: z.string().max(40).optional(),
-  image_url: z.string().max(2000).optional(),
+  image_url: z
+    .string()
+    .max(2000)
+    .optional()
+    .describe(
+      "HTTPS URL of a jpeg/png/webp/gif (max 5 MB). Only for kind=photo. The server downloads it into the private photos bucket and sets data.storagePath. Prefer https://. Rejects non-images and oversized files.",
+    ),
 });
 const deleteInput = z.object({
   id: z.string().uuid().optional(),
@@ -180,7 +186,7 @@ export const TOOL_CATALOG: { name: ToolName; title: string; description: string;
       "Return card schemas, palette tokens, and the Momente spotlight contract: kinds trip|competition|deadline|other, startsAt ISO instant (countdown = whole Europe/Bucharest calendar days until that date; 0 = azi), Romanian titles ok, tools upsert_spotlight and delete_spotlight with examples.",
     input: emptyInput,
   },
-  { name: "upsert_card", title: "Upsert card", description: "Create or update a card. The same externalId updates the existing card. A manual or locked card is refused. A win or progress card needs evidence.", input: cardInput },
+  { name: "upsert_card", title: "Upsert card", description: "Create or update a card on Victorii (viewId vision). The same externalId updates the existing card. A manual or locked card is refused. A win or progress card needs evidence. For a photo, pass kind=photo and image_url (HTTPS); the server stores it in the private photos bucket.", input: cardInput },
   { name: "delete_card", title: "Delete card", description: "Soft-delete a card the assistant owns. Pass id or externalId.", input: deleteInput },
   {
     name: "upsert_spotlight",
@@ -381,12 +387,45 @@ function schemaOf(): Outcome {
           clearSamples:
             "Seeded sample external ids: spotlight-vacanta-sample, spotlight-deadline-sample. Call delete_spotlight on those to clear Cast samples.",
         },
+        photos: {
+          viewId: "vision",
+          labelRo: "Victorii",
+          tool: "upsert_card",
+          description:
+            "Attach a photo to a Victorii card by passing kind=photo and image_url. The server downloads the image over HTTPS into the private photos bucket and writes data.storagePath. Phone remote uploads still set storagePath the same way.",
+          params: {
+            externalId: "string, required, stable idempotency key",
+            viewId: 'optional, defaults to "vision"',
+            kind: '"photo"',
+            title: "optional caption shown under the polaroid on TV",
+            body: "optional",
+            color: "optional palette token; photo frame uses paper styling on TV",
+            data: { alt: "optional string, max 200" },
+            expiresAt: "optional ISO date/time",
+            image_url: "HTTPS URL, required to attach/replace the image. jpeg/png/webp/gif, max 5 MB. Non-images are refused.",
+          },
+          example: {
+            externalId: "photo-vacanta-2026",
+            viewId: "vision",
+            kind: "photo",
+            title: "Vacanță",
+            image_url: "https://cdn.example/vacation.jpg",
+            data: { alt: "Familie la munte" },
+          },
+          notes: [
+            "Prefer https:// image_url. http:// top-level URLs are refused.",
+            "image_url is only valid when kind is photo.",
+            "Updating the same externalId with a new image_url replaces storagePath.",
+            "Omitting image_url keeps the existing photo when the card already has one.",
+          ],
+        },
         rules: [
           "A win or progress item needs evidence such as task:done:<id> or event:<id>.",
           "The same externalId updates the existing row, so a daily routine can run twice.",
           "A manual or locked row is left unchanged.",
           "A priority needs a reason and expires at the end of the day unless another time is given.",
           "Momente spotlights use upsert_spotlight / delete_spotlight. Day countdown is Bucharest calendar days, not hours.",
+          "Victorii photo cards: kind=photo + image_url (HTTPS). Server stores into the private photos bucket.",
         ],
       },
     }),
@@ -416,7 +455,9 @@ async function upsertCard(store: AgentStore, args: unknown, now: Date, fetchImag
   const warnings: string[] = [];
   if (value.image_url) {
     if (value.kind !== "photo") return no("image_url is only for a photo card");
-    const image = await fetchImage(value.image_url);
+    const https = httpsImageUrl(value.image_url);
+    if (!https.ok) return no(https.reason);
+    const image = await fetchImage(https.href);
     if (!image.ok) return no(image.reason);
     data = { ...data, storagePath: await store.saveImage(image.bytes, image.type) };
   }
@@ -1263,6 +1304,18 @@ function scrub(value: unknown): unknown {
     return next;
   }
   return value;
+}
+
+
+function httpsImageUrl(value: string): { ok: true; href: string } | { ok: false; reason: string } {
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    return { ok: false, reason: "image_url must be a public https URL" };
+  }
+  if (parsed.protocol !== "https:") return { ok: false, reason: "image_url must be a public https URL" };
+  return { ok: true, href: parsed.toString() };
 }
 
 function no(reason: string): Outcome {
