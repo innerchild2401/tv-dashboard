@@ -146,6 +146,54 @@ export type Database = {
         }
         Relationships: []
       }
+      display_control: {
+        Row: {
+          dimmed: boolean
+          id: number
+          mode: string
+          pinned_until: string | null
+          updated_at: string
+          view_id: string | null
+        }
+        Insert: {
+          dimmed?: boolean
+          id?: number
+          mode?: string
+          pinned_until?: string | null
+          updated_at?: string
+          view_id?: string | null
+        }
+        Update: {
+          dimmed?: boolean
+          id?: number
+          mode?: string
+          pinned_until?: string | null
+          updated_at?: string
+          view_id?: string | null
+        }
+        Relationships: []
+      }
+      pin_guard: {
+        Row: {
+          failures: number
+          id: number
+          locked_until: string | null
+          updated_at: string
+        }
+        Insert: {
+          failures?: number
+          id?: number
+          locked_until?: string | null
+          updated_at?: string
+        }
+        Update: {
+          failures?: number
+          id?: number
+          locked_until?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       events: {
         Row: {
           all_day: boolean

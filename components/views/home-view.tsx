@@ -7,6 +7,11 @@ export function HomeView({ view }: { view: HomeModel }) {
     <section className="home-board" aria-label={ro.views.home}>
       <div>
         <h2>{ro.tasks}</h2>
+        {view.inboxWaiting > 0 ? (
+          <p className="inbox-note">
+            {view.inboxWaiting} {ro.inboxWaiting}
+          </p>
+        ) : null}
         {view.tasks.length === 0 ? <p className="empty">{ro.noTasks}</p> : null}
         <ul className="check-list">
           {view.tasks.map((task) => (

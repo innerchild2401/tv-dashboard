@@ -7,7 +7,7 @@ export function VisionView({ view }: { view: VisionModel }) {
       {view.cards.map((card) => (
         <article
           key={card.id}
-          className={`vision-card ${card.color} ${card.kind}`}
+          className={`vision-card ${card.color} ${card.kind}${card.photoUrl ? " has-photo" : ""}`}
           style={{
             gridColumn: `${card.col + 1} / span ${card.colSpan}`,
             gridRow: `${card.row + 1} / span ${card.rowSpan}`,
@@ -22,6 +22,14 @@ export function VisionView({ view }: { view: VisionModel }) {
 }
 
 function CardBody({ card }: { card: VisionCardModel }) {
+  if (card.kind === "photo" && card.photoUrl) {
+    return (
+      <>
+        <img src={card.photoUrl} alt={card.title ?? card.body ?? ro.photo} />
+        {card.title ? <p className="card-kicker">{card.title}</p> : null}
+      </>
+    );
+  }
   if (card.kind === "affirmation") {
     return <p className="script">{card.body}</p>;
   }

@@ -1,6 +1,6 @@
 # Tablou TV
 
-A self-hosted dashboard for a Chromecast. One Next.js app serves the TV page, and later the phone remote, the API and the MCP endpoint. Supabase holds the data. Vercel hosts the app.
+A self-hosted dashboard for a Chromecast. One Next.js app serves the TV page, the phone remote, and the API. Supabase holds the data. Vercel hosts the app. The assistant endpoint is not wired yet.
 
 The TV page renders seven screens from the sample seed: Today, Week, Month, Site, TikTok, Vision board and Home. `/api/state` chooses the screen. Rotation uses each view's weight and dwell, skips an empty view, and gives Today's weight to Week when today has no events. A content-free Realtime broadcast asks the TV to refetch; it also polls every 30 seconds. A failed refetch leaves the last screen up. The page reloads itself once, around 04:00 Europe/Bucharest. Quiet hours, interrupts and time-of-day profiles are not applied yet. TikTok and analytics keys are not wired.
 
@@ -29,6 +29,8 @@ pnpm dev
 ```
 
 Open [http://127.0.0.1:3000/tv](http://127.0.0.1:3000/tv). In development, with `TV_TOKEN` empty, the page shows the sample Today view. A production process refuses `/tv` until `TV_TOKEN` is set, then the page expects `?token=` to match it.
+
+The phone remote is [http://127.0.0.1:3000/remote](http://127.0.0.1:3000/remote). It asks for `REMOTE_PIN` (4 to 6 digits), locks for 15 minutes after 5 wrong tries, and keeps a signed session for 30 days. From there you can pause, pin or lock a view, dim the TV, edit the layout, change vision-board cards (including a photo), check tasks and shopping, and capture an inbox note. A saved change broadcasts a content-free Realtime ping; the TV refetches, and it also polls every 30 seconds. Quiet hours, interrupts and time-of-day profiles can be edited and are stored. They are not applied to rotation yet.
 
 ```bash
 pnpm test

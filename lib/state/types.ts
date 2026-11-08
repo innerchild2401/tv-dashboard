@@ -1,4 +1,5 @@
 import type { ViewId } from "@/i18n/ro";
+import type { HoldMode } from "@/lib/remote/hold";
 import type { configSchema } from "@/lib/schemas";
 import type { PersonChip } from "@/lib/people";
 import type { AgendaItem, TodayView } from "@/lib/today/project";
@@ -42,6 +43,7 @@ export type SnapshotCard = {
   grid: { col: number; row: number; colSpan: number; rowSpan: number };
   expiresAt: string | null;
   data: Record<string, unknown>;
+  photoUrl?: string | null;
 };
 
 export type SnapshotMetric = {
@@ -77,6 +79,7 @@ export type Snapshot = {
   recap: SnapshotRecap | null;
   priorities: SnapshotPriority[];
   metrics: SnapshotMetric[];
+  inboxWaiting: number;
   weather: { location: string; tempC: number | null; label: string | null; fetchedAt: string | null };
   calendarFetchedAt: string | null;
 };
@@ -87,6 +90,8 @@ export type ChromeModel = {
   weather: { location: string; tempC: string; label: string; updatedLabel: string | null };
   priority: { text: string; reason: string } | null;
   pills: { id: ViewId; label: string; active: boolean }[];
+  accent: string;
+  theme: "dark" | "light";
 };
 
 export type TodayModel = Pick<
@@ -155,6 +160,7 @@ export type VisionCardModel = {
   progress: { label: string; value: number; max: number; style: "ring" | "bar"; text: string } | null;
   wins: string[];
   highlights: string[];
+  photoUrl: string | null;
 };
 
 export type VisionModel = { cards: VisionCardModel[] };
@@ -162,6 +168,7 @@ export type VisionModel = { cards: VisionCardModel[] };
 export type HomeModel = {
   tasks: { id: string; text: string; done: boolean; due: string | null; person: PersonChip | null }[];
   groups: { category: string; items: { id: string; text: string; qty: string | null; checked: boolean }[] }[];
+  inboxWaiting: number;
 };
 
 export type TvState = {
@@ -171,6 +178,8 @@ export type TvState = {
   until: string;
   reason: string;
   dwellRemaining: number;
+  hold: HoldMode;
+  dimmed: boolean;
   chrome: ChromeModel;
   today: TodayModel | null;
   week: WeekModel | null;

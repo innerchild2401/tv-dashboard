@@ -1,7 +1,7 @@
 "use client";
 
 import { RealtimeClient } from "@supabase/realtime-js";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { HomeView } from "@/components/views/home-view";
 import { MonthView } from "@/components/views/month-view";
 import { SiteView } from "@/components/views/site-view";
@@ -9,6 +9,7 @@ import { TikTokView } from "@/components/views/tiktok-view";
 import { TodayView } from "@/components/views/today-view";
 import { VisionView } from "@/components/views/vision-view";
 import { WeekView } from "@/components/views/week-view";
+import { ro } from "@/i18n/ro";
 import type { TvState } from "@/lib/state/types";
 import { NIGHTLY_RELOAD_KEY, nightlyReloadKey, shouldNightlyReload } from "@/lib/tv/reload";
 import { POLL_MS, nextTvState, withLiveClock } from "@/lib/tv/session";
@@ -119,11 +120,16 @@ export function TvScreen({
   }, [realtime]);
 
   const shown = withLiveClock(state, nowMs, live);
+  const dwellLabel = shown.hold === "paused" ? ro.paused : shown.hold === "locked" ? ro.lockedView : `${shown.dwellRemaining}s`;
   return (
-    <main className="tv-frame">
+    <main
+      className={shown.dimmed ? "tv-frame is-dim" : "tv-frame"}
+      data-theme={shown.chrome.theme}
+      style={{ "--accent": shown.chrome.accent } as CSSProperties}
+    >
       <div className="tv-slot">
         <div className="tv-stage">
-          <Chrome chrome={shown.chrome} dwellLabel={`${shown.dwellRemaining}s`}>
+          <Chrome chrome={shown.chrome} dwellLabel={dwellLabel}>
             <ViewBody state={shown} />
           </Chrome>
         </div>

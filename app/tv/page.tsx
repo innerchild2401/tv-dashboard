@@ -2,6 +2,7 @@ import { TvScreen } from "@/components/tv/screen";
 import { ro } from "@/i18n/ro";
 import { authorizeTv } from "@/lib/auth/tv";
 import { realtimeClientConfig } from "@/lib/realtime/channel";
+import { readControl } from "@/lib/remote/store";
 import { buildTvState } from "@/lib/state/build";
 import { loadSnapshot, } from "@/lib/state/load";
 import { sampleSnapshot } from "@/lib/state/sample";
@@ -35,8 +36,9 @@ export default async function TvPage({
   } catch {
     snapshot = sampleSnapshot(now);
   }
+  const control = await readControl();
 
-  return <TvScreen initial={buildTvState(snapshot, now, preview)} token={token} realtime={realtimeClientConfig()} />;
+  return <TvScreen initial={buildTvState(snapshot, now, preview, control)} token={token} realtime={realtimeClientConfig()} />;
 }
 
 function readParam(value: string | string[] | undefined): string {

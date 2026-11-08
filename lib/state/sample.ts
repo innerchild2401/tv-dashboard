@@ -42,6 +42,7 @@ export function sampleSnapshot(now: Date): Snapshot {
         updatedAt: now.toISOString(),
       },
     ],
+    inboxWaiting: 0,
     metrics: sampleMetrics(now).map(({ key, value, previous, fetchedAt, source }) => ({
       key,
       value,

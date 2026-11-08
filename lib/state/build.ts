@@ -1,4 +1,6 @@
 import { ro, rotationReason, type ViewId } from "@/i18n/ro";
+import { activeHold, ROTATE_CONTROL, type DisplayControl } from "@/lib/remote/hold";
+import { accentColor } from "@/lib/theme/accent";
 import { prepareCandidates, resolveRotation } from "@/lib/rotation/engine";
 import { viewCandidates } from "@/lib/state/availability";
 import { projectWeek, projectMonth } from "@/lib/views/calendar";
@@ -10,18 +12,37 @@ import { formatClock, formatLongDate } from "@/lib/time/bucharest";
 import { projectTodayFromEvents } from "@/lib/today/project";
 import type { Snapshot, TodayModel, TvState } from "@/lib/state/types";
 
-export function buildTvState(snapshot: Snapshot, now: Date, forceView?: ViewId | null): TvState {
+export function buildTvState(
+  snapshot: Snapshot,
+  now: Date,
+  forceView?: ViewId | null,
+  control: DisplayControl = ROTATE_CONTROL,
+): TvState {
   const configured = viewCandidates(snapshot, now);
   const prepared = prepareCandidates(configured, snapshot.config.rules.skipEmpty);
   const pool = prepared.length > 0 ? prepared : configured;
   const decision = resolveRotation(now, pool);
-  const forced = forceView && configured.some((view) => view.id === forceView) ? forceView : null;
-  const current = forced ?? decision.viewId;
+  const enabled = configured.map((view) => view.id);
+  const held = activeHold(control, now, enabled);
+  const forced = forceView && enabled.includes(forceView) ? forceView : null;
+  const current = forced ?? held.viewId ?? decision.viewId;
   const active = pool.find((view) => view.id === current) ?? configured.find((view) => view.id === current);
   const dwellSeconds = active?.dwellSeconds ?? decision.dwellSeconds;
   const weight = active?.weight ?? decision.weight;
-  const until = forced ? new Date(now.getTime() + dwellSeconds * 1000).toISOString() : decision.until;
-  const reason = pool.length === 0 ? ro.rotationOnly : rotationReason(current, weight);
+  let until = forced ? new Date(now.getTime() + dwellSeconds * 1000).toISOString() : decision.until;
+  let reason = pool.length === 0 ? ro.rotationOnly : rotationReason(current, weight);
+  let hold = held.mode;
+  if (forced || !held.viewId) hold = "rotate";
+  if (!forced && held.viewId && held.mode === "pinned" && control.pinnedUntil) {
+    until = control.pinnedUntil;
+    reason = `${ro.pinnedUntil} ${formatClock(new Date(control.pinnedUntil))}`;
+  } else if (!forced && held.mode === "paused" && held.viewId) {
+    until = new Date(now.getTime() + 86_400_000).toISOString();
+    reason = ro.paused;
+  } else if (!forced && held.mode === "locked" && held.viewId) {
+    until = new Date(now.getTime() + 86_400_000).toISOString();
+    reason = ro.lockedView;
+  }
   const priority = activePriority(snapshot, now);
   const calendarNote = updatedLabel(snapshot.calendarFetchedAt, now, CALENDAR_INTERVAL_MS);
   const today = projectTodayFromEvents({
@@ -53,6 +74,8 @@ export function buildTvState(snapshot: Snapshot, now: Date, forceView?: ViewId |
     until,
     reason,
     dwellRemaining: Math.max(0, Math.round((new Date(until).getTime() - now.getTime()) / 1000)),
+    hold,
+    dimmed: control.dimmed,
     chrome: {
       clock: formatClock(now),
       dateLabel: formatLongDate(now),
@@ -63,6 +86,8 @@ export function buildTvState(snapshot: Snapshot, now: Date, forceView?: ViewId |
         updatedLabel: updatedLabel(snapshot.weather.fetchedAt, now, WEATHER_INTERVAL_MS),
       },
       priority,
+      accent: accentColor(snapshot.config.theme.accent),
+      theme: snapshot.config.theme.mode,
       pills: configured.map((view) => ({
         id: view.id,
         label: ro.views[view.id],

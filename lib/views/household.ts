@@ -38,6 +38,7 @@ export function projectHome(snapshot: Snapshot, now: Date): HomeModel {
 
   return {
     tasks,
+    inboxWaiting: snapshot.inboxWaiting,
     groups: [...groups.entries()]
       .sort((left, right) => left[0].localeCompare(right[0], "ro"))
       .map(([category, items]) => ({ category, items })),
@@ -62,6 +63,7 @@ function toCard(card: SnapshotCard, snapshot: Snapshot, now: Date): VisionModel[
     progress: null as VisionModel["cards"][number]["progress"],
     wins: [] as string[],
     highlights: [] as string[],
+    photoUrl: card.photoUrl ?? null,
   };
 
   if (card.kind === "word") {

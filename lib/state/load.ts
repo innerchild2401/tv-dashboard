@@ -1,5 +1,7 @@
 import { readCalendarFetchedAt, readWeather, refreshDueIntegrations } from "@/lib/adapters/run";
-import { createServiceClient } from "@/lib/db/server";
+import { createServiceClient, databaseConfigured } from "@/lib/db/server";
+import { signPhotoMap } from "@/lib/photos/access";
+import { hasRemoteMemory, memorySnapshot } from "@/lib/remote/memory";
 import { cardSchema, configSchema } from "@/lib/schemas";
 import { sampleConfig } from "@/lib/seed/sample-config";
 import { sampleMetrics } from "@/lib/seed/sample-metrics";
@@ -8,7 +10,10 @@ import type { Snapshot, SnapshotCard, SnapshotMetric, SnapshotPriority } from "@
 import { addDays, zonedParts, zonedTimeToUtc } from "@/lib/time/bucharest";
 
 export async function loadSnapshot(now = new Date()): Promise<Snapshot> {
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  if (!databaseConfigured()) {
+    if (process.env.NODE_ENV === "development" && hasRemoteMemory()) {
+      return memorySnapshot(now) ?? sampleSnapshot(now);
+    }
     return sampleSnapshot(now);
   }
   try {
@@ -25,7 +30,7 @@ async function loadDatabaseSnapshot(now: Date): Promise<Snapshot> {
   const windowStart = zonedTimeToUtc({ ...addDays(parts, -45), hour: 0, minute: 0 }).toISOString();
   const windowEnd = zonedTimeToUtc({ ...addDays(parts, 45), hour: 23, minute: 59 }).toISOString();
 
-  const [configResult, eventsResult, tasksResult, shoppingResult, cardsResult, recapsResult, prioritiesResult, metricsResult] =
+  const [configResult, eventsResult, tasksResult, shoppingResult, cardsResult, recapsResult, prioritiesResult, metricsResult, inboxResult] =
     await Promise.all([
       supabase.from("config").select("*").eq("id", 1).maybeSingle(),
       supabase
@@ -55,6 +60,7 @@ async function loadDatabaseSnapshot(now: Date): Promise<Snapshot> {
         .order("updated_at", { ascending: false })
         .limit(10),
       supabase.from("metrics").select("key, value, previous, fetched_at, source").is("deleted_at", null),
+      supabase.from("inbox_items").select("id").eq("status", "new").is("deleted_at", null),
     ]);
 
   if (
@@ -65,7 +71,8 @@ async function loadDatabaseSnapshot(now: Date): Promise<Snapshot> {
     cardsResult.error ||
     recapsResult.error ||
     prioritiesResult.error ||
-    metricsResult.error
+    metricsResult.error ||
+    inboxResult.error
   ) {
     throw new Error("Dashboard data is unavailable");
   }
@@ -115,7 +122,15 @@ async function loadDatabaseSnapshot(now: Date): Promise<Snapshot> {
       grid: parsed.data.grid,
       expiresAt: parsed.data.expiresAt ?? null,
       data: parsed.data.data,
+      photoUrl: null,
     });
+  }
+  const signed = await signPhotoMap(
+    cards.flatMap((card) => (typeof card.data.storagePath === "string" ? [card.data.storagePath] : [])),
+  );
+  for (const card of cards) {
+    const path = card.data.storagePath;
+    if (typeof path === "string") card.photoUrl = signed.get(path) ?? null;
   }
 
   const metrics = mergeSampleMetrics(eventsToMetrics(metricsResult.data ?? []), now);
@@ -175,6 +190,7 @@ async function loadDatabaseSnapshot(now: Date): Promise<Snapshot> {
       }),
     ),
     metrics,
+    inboxWaiting: inboxResult.data?.length ?? 0,
     weather,
     calendarFetchedAt,
   };
