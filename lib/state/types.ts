@@ -186,6 +186,7 @@ export type TvState = {
   ok: true;
   generatedAt: string;
   currentView: ViewId;
+  nextView: ViewId;
   until: string;
   reason: string;
   dwellRemaining: number;

@@ -11,7 +11,7 @@ import { WeekView } from "@/components/views/week-view";
 import { ro } from "@/i18n/ro";
 import type { TvState } from "@/lib/state/types";
 import { NIGHTLY_RELOAD_KEY, nightlyReloadKey, shouldNightlyReload } from "@/lib/tv/reload";
-import { POLL_MS, nextTvState, withLiveClock } from "@/lib/tv/session";
+import { POLL_MS, nextTvState, tvPathWithView, withLiveClock } from "@/lib/tv/session";
 import { CLOCK_MS, delayUntil, onTvWake, scheduleEvery } from "@/lib/tv/timers";
 import { Chrome } from "@/components/tv/chrome";
 
@@ -27,24 +27,35 @@ export function TvScreen({
   const [state, setState] = useState(initial);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [live, setLive] = useState(false);
-  const refetchRef = useRef<() => void>(() => {});
+  const refetchRef = useRef<(opts?: { rotateFallback?: boolean }) => void>(() => {});
   const rootRef = useRef<HTMLElement | null>(null);
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
   useEffect(() => {
-    const pull = async () => {
+    const pull = async (opts?: { rotateFallback?: boolean }) => {
+      const current = stateRef.current;
       try {
         const headers = new Headers();
         if (token) headers.set("Authorization", `Bearer ${token}`);
         const response = await fetch(statePath(), { headers, cache: "no-store" });
-        if (!response.ok) return;
+        if (!response.ok) {
+          if (opts?.rotateFallback) advanceByUrl(current);
+          return;
+        }
         const body: unknown = await response.json();
-        setState((current) => nextTvState(current, body));
+        const next = nextTvState(current, body);
+        if (opts?.rotateFallback && next.until === current.until && next.currentView === current.currentView) {
+          advanceByUrl(current);
+          return;
+        }
+        setState(next);
       } catch {
-        // The last payload stays on screen while the server is unreachable.
+        if (opts?.rotateFallback) advanceByUrl(current);
       }
     };
-    refetchRef.current = () => {
-      void pull();
+    refetchRef.current = (opts) => {
+      void pull(opts);
     };
   }, [token]);
 
@@ -74,8 +85,9 @@ export function TvScreen({
   }, []);
 
   useEffect(() => {
-    return delayUntil(new Date(state.until).getTime(), () => refetchRef.current());
-  }, [state.until]);
+    if (state.hold === "paused" || state.hold === "locked") return;
+    return delayUntil(new Date(state.until).getTime(), () => refetchRef.current({ rotateFallback: true }));
+  }, [state.until, state.hold]);
 
   useEffect(() => {
     return onTvWake(() => {
@@ -151,6 +163,8 @@ export function TvScreen({
       className={["tv-frame", shown.dimmed ? "is-dim" : "", shown.quiet ? "is-quiet" : ""].filter(Boolean).join(" ")}
       data-theme={shown.chrome.theme}
       data-tv-root=""
+      data-view={shown.currentView}
+      data-next-view={shown.nextView}
       data-until={shown.until}
       data-tv-live={live ? "1" : "0"}
       style={{ "--accent": shown.chrome.accent } as CSSProperties}
@@ -179,7 +193,11 @@ function ViewBody({ state }: { state: TvState }) {
 }
 
 function statePath(): string {
-  if (process.env.NODE_ENV === "production") return "/api/state";
-  const view = new URLSearchParams(window.location.search).get("view");
-  return view ? `/api/state?view=${encodeURIComponent(view)}` : "/api/state";
+  // Prefer unforced live rotation via /api/state. Cast SSR uses ?view= on full navigation.
+  return "/api/state";
+}
+
+function advanceByUrl(state: TvState) {
+  if (state.hold === "paused" || state.hold === "locked") return;
+  window.location.assign(tvPathWithView(window.location.href, state.nextView));
 }

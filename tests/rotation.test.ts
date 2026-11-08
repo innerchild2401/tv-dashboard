@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { ViewId } from "../i18n/ro";
-import { prepareCandidates, resolveRotation, weightedPick, slotSeed, type RotationCandidate } from "../lib/rotation/engine";
+import { peekNextView, prepareCandidates, resolveRotation, weightedPick, slotSeed, type RotationCandidate } from "../lib/rotation/engine";
 import { sourceIsStale } from "../lib/state/availability";
 import { buildTvState } from "../lib/state/build";
 import { sampleSnapshot } from "../lib/state/sample";
-import { nextTvState } from "../lib/tv/session";
+import { nextTvState, tvPathWithView } from "../lib/tv/session";
 import { shouldNightlyReload } from "../lib/tv/reload";
 import { zonedTimeToUtc } from "../lib/time/bucharest";
 
@@ -101,6 +101,13 @@ describe("rotation", () => {
     const pick = weightedPick(pool, slotSeed("2026-11-07", 4), "today");
     assert.notEqual(pick.id, "today");
   });
+
+  it("peeks a different view at the dwell boundary", () => {
+    const now = zonedTimeToUtc({ year: 2026, month: 11, day: 8, hour: 12, minute: 0 });
+    const decision = resolveRotation(new Date(now.getTime() + 1000), pool);
+    const next = peekNextView(pool, decision.viewId, decision.until);
+    assert.notEqual(next, decision.viewId);
+  });
 });
 
 describe("state fallbacks", () => {
@@ -111,6 +118,19 @@ describe("state fallbacks", () => {
     assert.equal(nextTvState(current, { ok: false }), current);
     const next = buildTvState(sampleSnapshot(now), now, "home");
     assert.equal(nextTvState(current, next).currentView, "home");
+  });
+
+  it("encodes the next view for Cast SSR navigation", () => {
+    const now = zonedTimeToUtc({ year: 2026, month: 11, day: 8, hour: 12, minute: 0 });
+    const state = buildTvState(sampleSnapshot(now), now, "today");
+    assert.equal(state.currentView, "today");
+    assert.ok(state.nextView);
+    assert.notEqual(state.nextView, "today");
+    assert.equal(tvPathWithView("/tv?token=abc", state.nextView), `/tv?token=abc&view=${state.nextView}`);
+
+    const chained = buildTvState(sampleSnapshot(now), now, state.nextView);
+    assert.equal(chained.currentView, state.nextView);
+    assert.notEqual(chained.nextView, chained.currentView);
   });
 
   it("reloads once during the 04:00 hour in Bucharest", () => {

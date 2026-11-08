@@ -1,11 +1,14 @@
 /* Classic Chromecast / DashCast fallback.
  * ES5 only: Next/React bundles may fail to parse on old Cast Chromium.
- * Keeps the wall clock moving and reloads at dwell end when React never mounts.
+ * Keeps the wall clock moving and advances to the next view when React never mounts
+ * (or mounts but fails to rotate past dwell).
  */
 (function () {
   var TIME_ZONE = "Europe/Bucharest";
   var TICK_MS = 1000;
   var STUCK_MS = 90000;
+  var LIVE_GRACE_MS = 5000;
+  var advancedUntil = "";
 
   function pad(value) {
     return value < 10 ? "0" + value : String(value);
@@ -40,6 +43,11 @@
     return !!(node && node.getAttribute("data-tv-live") === "1");
   }
 
+  function holdActive(node) {
+    var dwell = document.querySelector("[data-tv-dwell]");
+    return !!(dwell && dwell.getAttribute("data-tv-hold") === "1");
+  }
+
   function paintClock() {
     var label = clockLabel(new Date());
     var nodes = document.querySelectorAll("[data-tv-clock]");
@@ -49,22 +57,45 @@
     return label;
   }
 
+  function advanceToNext(node) {
+    var next = node && node.getAttribute("data-next-view");
+    try {
+      if (next) {
+        var url = new URL(window.location.href);
+        url.searchParams.set("view", next);
+        window.location.assign(url.toString());
+        return;
+      }
+      window.location.reload();
+    } catch (err) {
+      try {
+        window.location.reload();
+      } catch (err2) {}
+    }
+  }
+
   function paintDwell(node, now) {
-    if (!node || reactLive(node)) return;
+    if (!node) return;
     var until = node.getAttribute("data-until");
     if (!until) return;
     var end = Date.parse(until);
     if (isNaN(end)) return;
-    var seconds = Math.max(0, Math.round((end - now) / 1000));
-    var dwell = document.querySelector("[data-tv-dwell]");
-    if (dwell && dwell.getAttribute("data-tv-hold") !== "1") {
-      dwell.textContent = seconds + "s";
+
+    var live = reactLive(node);
+    if (!live) {
+      var seconds = Math.max(0, Math.round((end - now) / 1000));
+      var dwell = document.querySelector("[data-tv-dwell]");
+      if (dwell && dwell.getAttribute("data-tv-hold") !== "1") {
+        dwell.textContent = seconds + "s";
+      }
     }
-    if (now >= end) {
-      try {
-        window.location.reload();
-      } catch (err) {}
-    }
+
+    if (holdActive(node)) return;
+    var grace = live ? LIVE_GRACE_MS : 0;
+    if (now < end + grace) return;
+    if (until === advancedUntil) return;
+    advancedUntil = until;
+    advanceToNext(node);
   }
 
   var lastLabel = "";
@@ -79,9 +110,7 @@
       lastLabel = label;
       lastAdvance = now;
     } else if (now - lastAdvance > STUCK_MS && !reactLive(node)) {
-      try {
-        window.location.reload();
-      } catch (err) {}
+      advanceToNext(node);
     }
   }
 
