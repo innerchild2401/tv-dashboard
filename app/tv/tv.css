@@ -1,4 +1,7 @@
 .tv-frame {
+  /* Safe default before JS: classic Cast is often a 1280×720 browser.
+     Prefer a slightly inset canvas over a 1920-wide stage that crops. */
+  --tv-scale: 0.9;
   width: 100vw;
   height: 100vh;
   display: grid;
@@ -40,24 +43,25 @@
 }
 
 .tv-slot {
-  width: calc(1920px * var(--tv-scale, 1));
-  height: calc(1080px * var(--tv-scale, 1));
+  /* Outer box matches the scaled design so letterboxing centers correctly. */
+  width: calc(1280px * var(--tv-scale, 0.9));
+  height: calc(720px * var(--tv-scale, 0.9));
 }
 
 .tv-stage {
-  width: 1920px;
-  height: 1080px;
+  width: 1280px;
+  height: 720px;
   overflow: hidden;
-  transform: scale(var(--tv-scale, 1));
+  transform: scale(var(--tv-scale, 0.9));
   transform-origin: top left;
   background: var(--bg);
 }
 
 .tv-canvas {
+  /* Design canvas 1280×720; display scale is only --tv-scale (1.5 on bare 1080p,
+     1.35 inside Cast/TV overscan-safe 90% of a 1920×1080 panel). */
   width: 1280px;
   height: 720px;
-  transform: scale(1.5);
-  transform-origin: top left;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -113,12 +117,12 @@
   gap: 2px;
   margin: 0;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .weather-meta span:first-child {
   color: var(--text);
-  font-size: 16px;
+  font-size: 18px;
 }
 
 .priority {
@@ -143,7 +147,7 @@
 .kicker {
   margin: 0;
   color: var(--accent);
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 600;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -166,7 +170,7 @@
 .empty {
   margin: 2px 0 0;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .tv-main {
@@ -258,7 +262,7 @@
   gap: 10px;
   margin: 4px 0;
   color: var(--accent);
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 600;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -350,7 +354,7 @@
 
 .day-label {
   color: var(--muted);
-  font-size: 15px;
+  font-size: 16px;
 }
 
 .day-titles {
@@ -370,7 +374,7 @@
   padding: 0 12px;
   border-radius: 999px;
   color: var(--muted);
-  font-size: 15px;
+  font-size: 16px;
 }
 
 .pill.active {
@@ -380,7 +384,7 @@
 
 .dwell {
   color: var(--muted);
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .tv-denied {
@@ -416,7 +420,7 @@
 .freshness {
   margin: 0;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .month-head {
@@ -458,7 +462,7 @@
 .home-board h3 {
   margin: 0;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .week-col header strong,
@@ -576,7 +580,7 @@
 .month-more {
   margin-top: 2px;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .dots i {
@@ -756,7 +760,7 @@
 .delta-spacer {
   margin: 0;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .video h2 {

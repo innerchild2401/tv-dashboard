@@ -20,4 +20,12 @@ describe("tv-tick Cast fallback", () => {
     assert.doesNotMatch(source, /\blet\b/);
     assert.doesNotMatch(source, /=>/);
   });
+
+  it("fits the 1280×720 design into the Cast safe viewport without React", () => {
+    assert.match(source, /DESIGN_W = 1280/);
+    assert.match(source, /DESIGN_H = 720/);
+    assert.match(source, /SAFE_FRACTION = 0\.9/);
+    assert.match(source, /--tv-scale/);
+    assert.match(source, /applyFit/);
+  });
 });

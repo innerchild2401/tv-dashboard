@@ -8,7 +8,25 @@
   var TICK_MS = 1000;
   var STUCK_MS = 90000;
   var LIVE_GRACE_MS = 5000;
+  /* Keep in sync with lib/tv/fit.ts — design canvas + Cast overscan safe area. */
+  var DESIGN_W = 1280;
+  var DESIGN_H = 720;
+  var SAFE_FRACTION = 0.9;
   var advancedUntil = "";
+
+  function fitScale() {
+    var width = Math.max(1, window.innerWidth || 0) * SAFE_FRACTION;
+    var height = Math.max(1, window.innerHeight || 0) * SAFE_FRACTION;
+    return Math.min(width / DESIGN_W, height / DESIGN_H);
+  }
+
+  function applyFit() {
+    try {
+      var scale = fitScale();
+      if (!isFinite(scale) || scale <= 0) scale = SAFE_FRACTION;
+      document.documentElement.style.setProperty("--tv-scale", scale.toFixed(4));
+    } catch (err) {}
+  }
 
   function pad(value) {
     return value < 10 ? "0" + value : String(value);
@@ -115,12 +133,14 @@
   }
 
   function arm() {
+    applyFit();
     tick();
     window.setInterval(tick, TICK_MS);
   }
 
   function onWake() {
     lastAdvance = Date.now();
+    applyFit();
     tick();
   }
 
@@ -136,5 +156,6 @@
     });
     window.addEventListener("pageshow", onWake);
     window.addEventListener("focus", onWake);
+    window.addEventListener("resize", applyFit);
   }
 })();

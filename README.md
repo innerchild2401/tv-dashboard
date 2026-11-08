@@ -18,7 +18,7 @@ The TV page renders seven screens: Today, Week, Month, Site, TikTok, Vision boar
 | Production | https://tv-dashboard-sigma-one.vercel.app |
 | UI language | Romanian |
 | Time zone | Europe/Bucharest, 24-hour clock, weeks start Monday |
-| Design size | 1280×720, drawn at 1920×1080 (scale ×1.5) |
+| Design size | 1280×720, uniform letterbox into the Cast/TV viewport (×1.5 on bare 1080p; ×1.35 inside the 10% overscan-safe area) |
 | Scheduling | Supabase `pg_cron` and `pg_net`, not Vercel Cron |
 
 ## Fresh deploy

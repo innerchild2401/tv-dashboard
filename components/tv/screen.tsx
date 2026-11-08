@@ -10,6 +10,7 @@ import { VisionView } from "@/components/views/vision-view";
 import { WeekView } from "@/components/views/week-view";
 import { ro } from "@/i18n/ro";
 import type { TvState } from "@/lib/state/types";
+import { tvFitScale } from "@/lib/tv/fit";
 import { NIGHTLY_RELOAD_KEY, nightlyReloadKey, shouldNightlyReload } from "@/lib/tv/reload";
 import { POLL_MS, nextTvState, tvPathWithView, withLiveClock } from "@/lib/tv/session";
 import { CLOCK_MS, delayUntil, onTvWake, scheduleEvery } from "@/lib/tv/timers";
@@ -61,7 +62,8 @@ export function TvScreen({
 
   useEffect(() => {
     const fit = () => {
-      const scale = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+      // Uniform letterbox of the 1280×720 design into the Cast/TV safe viewport.
+      const scale = tvFitScale(window.innerWidth, window.innerHeight);
       document.documentElement.style.setProperty("--tv-scale", scale.toFixed(4));
     };
     fit();
