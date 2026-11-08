@@ -2,7 +2,7 @@
 
 A self-hosted dashboard for a Chromecast. One Next.js app serves the TV page, the phone remote, the API, and the MCP endpoint. Supabase holds the data. Vercel hosts the app. Grokbot writes through `/mcp` or `POST /api/agent/<tool>` with the `AGENT_TOKEN` bearer token.
 
-The TV page renders five screens: Today, Week, Momente, Vision board, and Home. `/api/state` chooses the screen with a simple round-robin (120 seconds each, no immediate repeat). Empty views are skipped when `skipEmpty` is on. Quiet hours, 23:00 to 06:00 Europe/Bucharest, show a dimmed clock. An event starting within 30 minutes, or a priority due within 2 hours, puts Today on screen for 2 minutes in every cycle and keeps the priority banner on every view. A birthday adds a celebration card on Vision. Rain forecast within 2 hours of an outdoor event shows a header alert. Each rule can be switched off on the phone. `/remote` lists the reason for every rule that is on. A content-free Realtime broadcast asks the TV to refetch. It also polls every 30 seconds. A failed refetch leaves the last screen up. The page reloads itself once, around 04:00 Europe/Bucharest.
+The TV page renders five screens: Today, Week, Momente, Victorii (vision board), and Home. `/api/state` chooses the screen with a simple round-robin (120 seconds each, no immediate repeat). Empty views are skipped when `skipEmpty` is on. Quiet hours, 23:00 to 06:00 Europe/Bucharest, show a dimmed clock. An event starting within 30 minutes, or a priority due within 2 hours, puts Today on screen for 2 minutes in every cycle and keeps the priority banner on every view. A birthday adds a celebration card on Vision. Rain forecast within 2 hours of an outdoor event shows a header alert. Each rule can be switched off on the phone. `/remote` lists the reason for every rule that is on. A content-free Realtime broadcast asks the TV to refetch. It also polls every 30 seconds. A failed refetch leaves the last screen up. The page reloads itself once, around 04:00 Europe/Bucharest.
 
 ## Defaults
 
@@ -248,6 +248,21 @@ python3 -m unittest discover -s pi-agent/tests -v
 Grokbot calls `/mcp` (stateless Streamable HTTP, tools only). The same handlers are `POST /api/agent/<tool>`. Send `Authorization: Bearer` with `AGENT_TOKEN`. The token cannot change config, the PIN, or other tokens. The assistant can pin a view for at most 30 minutes and cannot lock the screen.
 
 A run calls `get_dashboard_state`, then `get_inbox` and `route_inbox_item` for anything still waiting, then `set_recap`, then `set_priority`, then `upsert_card` for the affirmation, weekly wins, and word of the month, then `upsert_events`, `upsert_task`, and `shopping_add`. Use stable ids such as `recap-2026-11-08`, `affirmation-2026-11-08`, `wins-2026-11-08`, and `word-2026-11-08`. The same id updates the existing row, so the routine can run twice.
+
+Victorii (view id `vision`) accepts photo cards from Grokbot. Call `upsert_card` with `kind: "photo"` and an HTTPS `image_url` (jpeg/png/webp/gif, max 5 MB). The server downloads the image into the private `photos` bucket and stores `data.storagePath`. Non-images and oversized files are refused. Prefer `https://`. Phone remote camera/gallery uploads still write the same `storagePath` field. Example:
+
+```json
+{
+  "externalId": "photo-vacanta-2026",
+  "viewId": "vision",
+  "kind": "photo",
+  "title": "Vacanță",
+  "image_url": "https://cdn.example/vacation.jpg",
+  "data": { "alt": "Familie la munte" }
+}
+```
+
+`get_schema` returns the same photo contract under `schema.photos` (MCP `/mcp` and `POST /api/agent/get_schema`).
 
 Momente (view id `momente`) shows countdown spotlights. Call `get_schema` for the full contract, or use `upsert_spotlight` / `delete_spotlight` (also at `POST /api/agent/upsert_spotlight` and `POST /api/agent/delete_spotlight`). Countdown is whole Europe/Bucharest calendar days until `startsAt` (0 = azi). Seeded samples use `spotlight-vacanta-sample` and `spotlight-deadline-sample`; delete those external ids to clear them.
 
