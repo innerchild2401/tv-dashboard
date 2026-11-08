@@ -20,13 +20,23 @@ class Config:
     heartbeat_seconds: int = 60
     backoff_cap_seconds: int = 300
     discovery_timeout_seconds: int = 5
+    # force=true loads X-Frame blocked pages but disables DashCast reload_seconds.
+    dashcast_force: bool = False
+    # Periodic receiver reload while force is false (0 = off). Recovers a frozen JS page.
+    dashcast_reload_seconds: int = 1800
+    # When force is true (no DashCast reload), re-cast the same URL on this interval (0 = off).
+    dashboard_refresh_seconds: int = 0
 
     def settings(self) -> Settings:
+        refresh = self.dashboard_refresh_seconds
+        if self.dashcast_force and refresh <= 0 and self.dashcast_reload_seconds > 0:
+            refresh = self.dashcast_reload_seconds
         return Settings(
             loop_seconds=self.loop_seconds,
             idle_seconds=self.idle_seconds,
             heartbeat_seconds=self.heartbeat_seconds,
             backoff_cap_seconds=self.backoff_cap_seconds,
+            dashboard_refresh_seconds=refresh,
         )
 
     def tv_url(self) -> str:
@@ -67,6 +77,9 @@ def parse_config(text: str) -> Config:
         heartbeat_seconds=_number(values.get("heartbeat_seconds"), 60),
         backoff_cap_seconds=_number(values.get("backoff_cap_seconds"), 300),
         discovery_timeout_seconds=_number(values.get("discovery_timeout_seconds"), 5),
+        dashcast_force=_flag(values.get("dashcast_force"), False),
+        dashcast_reload_seconds=_number_or_zero(values.get("dashcast_reload_seconds"), 1800),
+        dashboard_refresh_seconds=_number_or_zero(values.get("dashboard_refresh_seconds"), 0),
     )
 
 
@@ -81,3 +94,19 @@ def _number(value: str | None, fallback: int) -> int:
     except (TypeError, ValueError):
         return fallback
     return parsed if parsed > 0 else fallback
+
+
+def _number_or_zero(value: str | None, fallback: int) -> int:
+    if value is None or str(value).strip() == "":
+        return fallback
+    try:
+        parsed = int(str(value).strip())
+    except (TypeError, ValueError):
+        return fallback
+    return parsed if parsed >= 0 else fallback
+
+
+def _flag(value: str | None, fallback: bool) -> bool:
+    if value is None or str(value).strip() == "":
+        return fallback
+    return str(value).strip().casefold() in {"1", "true", "yes", "on"}

@@ -1,6 +1,5 @@
 "use client";
 
-import { RealtimeClient } from "@supabase/realtime-js";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { HomeView } from "@/components/views/home-view";
 import { MonthView } from "@/components/views/month-view";
@@ -13,6 +12,7 @@ import { ro } from "@/i18n/ro";
 import type { TvState } from "@/lib/state/types";
 import { NIGHTLY_RELOAD_KEY, nightlyReloadKey, shouldNightlyReload } from "@/lib/tv/reload";
 import { POLL_MS, nextTvState, withLiveClock } from "@/lib/tv/session";
+import { CLOCK_MS, delayUntil, onTvWake, scheduleEvery } from "@/lib/tv/timers";
 import { Chrome } from "@/components/tv/chrome";
 
 export function TvScreen({
@@ -25,9 +25,10 @@ export function TvScreen({
   realtime: { url: string; anonKey: string; channel: string } | null;
 }) {
   const [state, setState] = useState(initial);
-  const [nowMs, setNowMs] = useState(0);
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const [live, setLive] = useState(false);
   const refetchRef = useRef<() => void>(() => {});
+  const rootRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     const pull = async () => {
@@ -58,24 +59,31 @@ export function TvScreen({
   }, []);
 
   useEffect(() => {
-    const tick = window.setInterval(() => {
+    const stop = scheduleEvery(() => {
       setNowMs(Date.now());
       setLive(true);
-    }, 1000);
-    return () => window.clearInterval(tick);
+      const node = rootRef.current;
+      if (node) node.setAttribute("data-tv-live", "1");
+    }, CLOCK_MS);
+    return stop;
   }, []);
 
   useEffect(() => {
-    const poll = window.setInterval(() => refetchRef.current(), POLL_MS);
-    return () => window.clearInterval(poll);
+    const stop = scheduleEvery(() => refetchRef.current(), POLL_MS);
+    return stop;
   }, []);
 
   useEffect(() => {
-    const delay = new Date(state.until).getTime() - Date.now();
-    if (delay < 0) return;
-    const timer = window.setTimeout(() => refetchRef.current(), delay + 250);
-    return () => window.clearTimeout(timer);
+    return delayUntil(new Date(state.until).getTime(), () => refetchRef.current());
   }, [state.until]);
+
+  useEffect(() => {
+    return onTvWake(() => {
+      setNowMs(Date.now());
+      setLive(true);
+      refetchRef.current();
+    });
+  }, []);
 
   useEffect(() => {
     const check = () => {
@@ -96,40 +104,60 @@ export function TvScreen({
       window.location.reload();
     };
     check();
-    const timer = window.setInterval(check, POLL_MS);
-    return () => window.clearInterval(timer);
+    const stop = scheduleEvery(check, POLL_MS);
+    return stop;
   }, []);
 
   useEffect(() => {
     if (!realtime) return;
-    const client = new RealtimeClient(`${realtime.url}/realtime/v1`, {
-      params: { apikey: realtime.anonKey },
-      logger: () => {},
-    });
-    const channel = client.channel(realtime.channel, {
-      config: { broadcast: { self: false } },
-    });
-    channel.on("broadcast", { event: "changed" }, () => {
-      refetchRef.current();
-    });
-    channel.subscribe();
+    let cancelled = false;
+    let cleanup: (() => void) | undefined;
+
+    void import("@supabase/realtime-js")
+      .then(({ RealtimeClient }) => {
+        if (cancelled) return;
+        const client = new RealtimeClient(`${realtime.url}/realtime/v1`, {
+          params: { apikey: realtime.anonKey },
+          logger: () => {},
+        });
+        const channel = client.channel(realtime.channel, {
+          config: { broadcast: { self: false } },
+        });
+        channel.on("broadcast", { event: "changed" }, () => {
+          refetchRef.current();
+        });
+        channel.subscribe();
+        cleanup = () => {
+          void client.removeChannel(channel);
+          void client.disconnect();
+        };
+      })
+      .catch(() => {
+        // Realtime is a nudge only; poll + dwell timers keep the TV moving.
+      });
+
     return () => {
-      void client.removeChannel(channel);
-      void client.disconnect();
+      cancelled = true;
+      cleanup?.();
     };
   }, [realtime]);
 
   const shown = withLiveClock(state, nowMs, live);
+  const holdFixed = shown.hold === "paused" || shown.hold === "locked";
   const dwellLabel = shown.hold === "paused" ? ro.paused : shown.hold === "locked" ? ro.lockedView : `${shown.dwellRemaining}s`;
   return (
     <main
+      ref={rootRef}
       className={["tv-frame", shown.dimmed ? "is-dim" : "", shown.quiet ? "is-quiet" : ""].filter(Boolean).join(" ")}
       data-theme={shown.chrome.theme}
+      data-tv-root=""
+      data-until={shown.until}
+      data-tv-live={live ? "1" : "0"}
       style={{ "--accent": shown.chrome.accent } as CSSProperties}
     >
       <div className="tv-slot">
         <div className="tv-stage">
-          <Chrome chrome={shown.chrome} dwellLabel={dwellLabel}>
+          <Chrome chrome={shown.chrome} dwellLabel={dwellLabel} holdFixed={holdFixed}>
             <ViewBody state={shown} />
           </Chrome>
         </div>

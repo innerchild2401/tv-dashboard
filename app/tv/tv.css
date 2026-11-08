@@ -62,14 +62,8 @@
   flex-direction: column;
   gap: 12px;
   padding: 20px 28px 14px;
-  animation: tv-shift 20min steps(1, end) infinite;
-}
-
-@keyframes tv-shift {
-  0% { transform: translate(0, 0) scale(1.5); }
-  25% { transform: translate(1px, 2px) scale(1.5); }
-  50% { transform: translate(2px, 0) scale(1.5); }
-  75% { transform: translate(0, 1px) scale(1.5); }
+  /* No CSS animation: DashCast/Chromecast often freezes pages that keep
+     compositor animations running. Burn-in shift is skipped on Cast. */
 }
 
 .tv-header,

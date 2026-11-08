@@ -5,17 +5,21 @@ import type { ChromeModel } from "@/lib/state/types";
 export function Chrome({
   chrome,
   dwellLabel,
+  holdFixed = false,
   children,
 }: {
   chrome: ChromeModel;
   dwellLabel: string;
+  holdFixed?: boolean;
   children: ReactNode;
 }) {
   return (
     <div className="tv-canvas">
       <header className="tv-header">
         <div>
-          <p className="clock">{chrome.clock}</p>
+          <p className="clock" data-tv-clock="">
+            {chrome.clock}
+          </p>
           <p className="date-label">{chrome.dateLabel}</p>
         </div>
         {chrome.weather.tempC ? (
@@ -57,7 +61,11 @@ export function Chrome({
           {chrome.pills.map((item) => (
             <li key={item.id} className={item.active ? "pill active" : "pill"} aria-current={item.active ? "true" : undefined}>
               <span>{item.label}</span>
-              {item.active ? <span className="dwell">{dwellLabel}</span> : null}
+              {item.active ? (
+                <span className="dwell" data-tv-dwell="" data-tv-hold={holdFixed ? "1" : "0"}>
+                  {dwellLabel}
+                </span>
+              ) : null}
             </li>
           ))}
         </ol>
