@@ -1,8 +1,10 @@
 import { ro } from "@/i18n/ro";
+import { MOMENTE_DESIGN } from "@/lib/agent/design";
 import type { MomenteItem, MomenteLayout, MomenteModel, Snapshot, SnapshotSpotlight } from "@/lib/state/types";
 import { dateKey, formatMomenteDue, zonedParts } from "@/lib/time/bucharest";
 
-export const MOMENTE_MAX_VISIBLE = 6;
+/** Soft ceiling so a runaway feed cannot flood the Cast canvas. All active items show up to this. */
+export const MOMENTE_MAX_VISIBLE = MOMENTE_DESIGN.maxVisible;
 
 /** Whole Bucharest calendar days from `now` until `startsAt`. Day 0 = today. */
 export function bucharestDaysUntil(startsAt: string | Date, now: Date): number {
@@ -19,7 +21,8 @@ export function momenteLayoutForCount(count: number): MomenteLayout {
   if (count === 2) return "split";
   if (count <= 4) return "tiles";
   if (count <= 6) return "dense";
-  return "overflow";
+  if (count <= 9) return "gallery";
+  return "packed";
 }
 
 export function selectMomenteItems(spotlights: SnapshotSpotlight[], now: Date): {
@@ -34,7 +37,7 @@ export function selectMomenteItems(spotlights: SnapshotSpotlight[], now: Date): 
 
   const layout = momenteLayoutForCount(live.length);
   if (live.length <= MOMENTE_MAX_VISIBLE) {
-    return { items: live, hidden: 0, layout: layout === "overflow" ? "dense" : layout };
+    return { items: live, hidden: 0, layout };
   }
 
   const pinned = live.filter((item) => item.pinned);
@@ -52,7 +55,7 @@ export function selectMomenteItems(spotlights: SnapshotSpotlight[], now: Date): 
   return {
     items: kept,
     hidden: live.length - kept.length,
-    layout: "overflow",
+    layout: momenteLayoutForCount(kept.length),
   };
 }
 

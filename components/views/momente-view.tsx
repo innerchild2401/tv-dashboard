@@ -49,7 +49,8 @@ function layoutClass(view: MomenteModel): string {
   if (count === 2) return "momente--2";
   if (count <= 4) return `momente--${count}`;
   if (count <= 6) return "momente--dense";
-  return "momente--overflow";
+  if (count <= 9) return "momente--gallery";
+  return "momente--packed";
 }
 
 function countAria(item: MomenteItem): string {

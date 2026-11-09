@@ -1,4 +1,5 @@
 import { ro } from "@/i18n/ro";
+import { parseFontScale } from "@/lib/agent/design";
 import { formatCount } from "@/lib/format/display";
 import { personChip } from "@/lib/people";
 import type {
@@ -29,6 +30,7 @@ export function projectVision(snapshot: Snapshot, now: Date, celebration?: strin
       row: spot.row,
       colSpan: 1,
       rowSpan: 1,
+      fontScale: "md",
       title: ro.celebrationDay,
       body: celebration,
       word: null,
@@ -153,6 +155,7 @@ function toCard(card: SnapshotCard, snapshot: Snapshot, now: Date): VisionModel[
     row: card.grid.row,
     colSpan: card.grid.colSpan,
     rowSpan: card.grid.rowSpan,
+    fontScale: parseFontScale(card.data.fontScale),
     title: card.title,
     body: card.body,
     word: null as string | null,

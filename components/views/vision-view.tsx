@@ -7,7 +7,7 @@ export function VisionView({ view }: { view: VisionModel }) {
       {view.cards.map((card) => (
         <article
           key={card.id}
-          className={`vision-card ${card.color} ${card.kind}${card.photoUrl ? " has-photo" : ""}`}
+          className={`vision-card ${card.color} ${card.kind} font-${card.fontScale}${card.photoUrl ? " has-photo" : ""}`}
           style={{
             gridColumn: `${card.col + 1} / span ${card.colSpan}`,
             gridRow: `${card.row + 1} / span ${card.rowSpan}`,

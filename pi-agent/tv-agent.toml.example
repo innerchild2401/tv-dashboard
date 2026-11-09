@@ -16,9 +16,12 @@ heartbeat_seconds = 60
 backoff_cap_seconds = 300
 discovery_timeout_seconds = 5
 
-# DashCast: force=true helps sites that block iframes, but it disables reload_seconds.
-# This app allows framing /tv, so force stays false and DashCast reloads every 30 minutes.
+# DashCast: force=true helps sites that block iframes, but it disables reload_seconds
+# and flashes the DashCast splash on every load_url. Prefer force=false.
+# This app allows framing /tv, so force stays false.
+# reload_seconds recovers a frozen page; keep it high (30–60 min) to avoid mid-rotation splash.
+# View rotation happens inside the page via /api/state — do not rely on Pi re-casts for that.
 dashcast_force = false
 dashcast_reload_seconds = 1800
-# Only needed when dashcast_force = true (DashCast will not self-reload).
+# Only needed when dashcast_force = true (DashCast will not self-reload). Leave 0 otherwise.
 dashboard_refresh_seconds = 0

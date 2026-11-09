@@ -12,6 +12,18 @@ import "./tv.css";
 
 export const dynamic = "force-dynamic";
 
+/** Preload Cast-critical faces so Space Grotesk / Fredoka / Caveat are ready before paint. */
+const TV_FONT_PRELOADS = [
+  "/fonts/space-grotesk-latin-500-normal.woff2",
+  "/fonts/space-grotesk-latin-700-normal.woff2",
+  "/fonts/space-grotesk-latin-ext-500-normal.woff2",
+  "/fonts/space-grotesk-latin-ext-700-normal.woff2",
+  "/fonts/fredoka-latin-600-normal.woff2",
+  "/fonts/fredoka-latin-ext-600-normal.woff2",
+  "/fonts/caveat-latin-500-normal.woff2",
+  "/fonts/caveat-latin-ext-500-normal.woff2",
+] as const;
+
 export default async function TvPage({
   searchParams,
 }: {
@@ -43,6 +55,9 @@ export default async function TvPage({
 
   return (
     <>
+      {TV_FONT_PRELOADS.map((href) => (
+        <link key={href} rel="preload" href={href} as="font" type="font/woff2" crossOrigin="anonymous" />
+      ))}
       {/* Raw classic script in SSR HTML so DashCast gets a clock even if React never mounts. */}
       <script src="/tv-tick.js" nonce={nonce} />
       <TvScreen initial={buildTvState(snapshot, now, preview, control)} token={token} realtime={realtimeClientConfig()} />

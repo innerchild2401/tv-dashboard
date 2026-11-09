@@ -10,7 +10,12 @@ describe("tv-tick Cast fallback", () => {
     assert.match(source, /data-next-view/);
     assert.match(source, /searchParams\.set\("view"/);
     assert.match(source, /location\.assign/);
-    assert.match(source, /LIVE_GRACE_MS/);
+  });
+
+  it("does not full-navigate while React is live (avoids DashCast flash)", () => {
+    assert.match(source, /When React is live it rotates via \/api\/state/);
+    assert.match(source, /if \(live\) return;/);
+    assert.doesNotMatch(source, /var grace = live \? LIVE_GRACE_MS : 0;/);
   });
 
   it("stays ES5-safe for classic Cast Chromium", () => {

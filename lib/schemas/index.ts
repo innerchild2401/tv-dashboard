@@ -6,6 +6,8 @@ export const paletteTokenSchema = z.enum(["sand", "coral", "lilac", "mint", "sky
 
 const evidenceSchema = z.string().trim().min(1).max(200);
 
+const fontScaleSchema = z.enum(["sm", "md", "lg"]).optional();
+
 const gridSchema = z.object({
   col: z.number().int().nonnegative(),
   row: z.number().int().nonnegative(),
@@ -35,12 +37,13 @@ export const cardSchema = z.discriminatedUnion("kind", [
     data: z.object({
       storagePath: z.string().min(1).optional(),
       alt: z.string().max(200).optional(),
+      fontScale: fontScaleSchema,
     }),
   }),
   z.object({
     ...cardBase,
     kind: z.literal("affirmation"),
-    data: z.object({ text: z.string().max(500).optional() }),
+    data: z.object({ text: z.string().max(500).optional(), fontScale: fontScaleSchema }),
   }),
   z.object({
     ...cardBase,
@@ -48,12 +51,13 @@ export const cardSchema = z.discriminatedUnion("kind", [
     data: z.object({
       target: z.string().datetime({ offset: true }),
       label: z.string().max(200).optional(),
+      fontScale: fontScaleSchema,
     }),
   }),
   z.object({
     ...cardBase,
     kind: z.literal("word"),
-    data: z.object({ word: z.string().trim().min(1).max(80) }),
+    data: z.object({ word: z.string().trim().min(1).max(80), fontScale: fontScaleSchema }),
   }),
   z.object({
     ...cardBase,
@@ -64,6 +68,7 @@ export const cardSchema = z.discriminatedUnion("kind", [
       max: z.number().positive(),
       style: z.enum(["ring", "bar"]),
       evidence: evidenceSchema,
+      fontScale: fontScaleSchema,
     }),
   }),
   z.object({
@@ -78,17 +83,18 @@ export const cardSchema = z.discriminatedUnion("kind", [
           }),
         )
         .max(8),
+      fontScale: fontScaleSchema,
     }),
   }),
   z.object({
     ...cardBase,
     kind: z.literal("recap"),
-    data: z.object({ recapId: z.string().uuid().optional() }),
+    data: z.object({ recapId: z.string().uuid().optional(), fontScale: fontScaleSchema }),
   }),
   z.object({
     ...cardBase,
     kind: z.literal("note"),
-    data: z.object({ text: z.string().max(500).optional() }),
+    data: z.object({ text: z.string().max(500).optional(), fontScale: fontScaleSchema }),
   }),
 ]);
 

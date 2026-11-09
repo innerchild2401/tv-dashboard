@@ -228,11 +228,57 @@ describe("agent transport", () => {
     const payload = JSON.parse(await mcpJson(listed)) as { result?: { tools?: { name: string }[] }; error?: { message?: string } };
     const names = payload.result?.tools?.map((tool) => tool.name) ?? [];
     assert.ok(names.includes("upsert_card"), payload.error?.message ?? JSON.stringify(payload));
+    assert.ok(names.includes("get_view_design"), payload.error?.message ?? JSON.stringify(payload));
     assert.ok(names.includes("upsert_spotlight"), payload.error?.message ?? JSON.stringify(payload));
     assert.ok(names.includes("delete_spotlight"));
     assert.ok(names.includes("route_inbox_item"));
     assert.ok(names.includes("undo"));
     assert.equal(names.includes("resources/list"), false);
+  });
+});
+
+describe("vision layout and view design", () => {
+  it("lets Grokbot set grid, tilt, and fontScale within constraints", async () => {
+    const store = new MemoryStore();
+    const saved = await executeTool(
+      "upsert_card",
+      {
+        externalId: "layout-1",
+        kind: "affirmation",
+        title: "Calm",
+        body: "Respiră",
+        color: "pink",
+        grid: { col: 1, row: 0, colSpan: 2, rowSpan: 1 },
+        tilt: -2,
+        fontScale: "lg",
+      },
+      { store, now },
+    );
+    assert.equal(saved.ok, true, saved.reason);
+    const card = (await store.cards()).find((item) => item.externalId === "layout-1");
+    assert.equal(card?.gridCol, 1);
+    assert.equal(card?.gridColSpan, 2);
+    assert.equal(card?.tilt, -2);
+    assert.equal(card?.data.fontScale, "lg");
+
+    const bad = await executeTool(
+      "upsert_card",
+      { externalId: "layout-bad", kind: "note", title: "X", grid: { col: 3, row: 0, colSpan: 2, rowSpan: 1 } },
+      { store, now },
+    );
+    assert.equal(bad.ok, false);
+    assert.match(bad.reason ?? "", /4×3|grid/i);
+
+    const design = await executeTool("get_view_design", { viewId: "vision" }, { store, now });
+    assert.equal(design.ok, true);
+    const body = design.schema as { view?: { viewId?: string; maxCards?: number; knobs?: string[] }; instructions?: string[] };
+    assert.equal(body.view?.viewId, "vision");
+    assert.equal(body.view?.maxCards, 12);
+    assert.ok(body.view?.knobs?.includes("grid"));
+    assert.ok((body.instructions ?? []).some((line) => /get_view_design|get_schema/i.test(line)));
+
+    const schema = await executeTool("get_schema", {}, { store, now });
+    assert.ok((schema.schema as { design?: { views?: { vision?: unknown } } })?.design?.views?.vision);
   });
 });
 

@@ -407,7 +407,7 @@
 .week-board {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
 }
 
 .week {
@@ -415,7 +415,7 @@
   min-height: 0;
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 10px;
+  gap: 6px;
 }
 
 .freshness {
@@ -445,9 +445,10 @@
 .week-col {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
   min-width: 0;
-  padding: 12px;
+  min-height: 0;
+  padding: 8px 8px 6px;
   overflow: hidden;
 }
 
@@ -463,13 +464,13 @@
 .home-board h3 {
   margin: 0;
   color: var(--muted);
-  font-size: 16px;
+  font-size: 14px;
 }
 
 .week-col header strong,
 .month-cell strong {
   font-family: "Space Grotesk", sans-serif;
-  font-size: 28px;
+  font-size: 22px;
   line-height: 1;
 }
 
@@ -482,10 +483,17 @@
   padding: 0;
 }
 
+.week-col ul {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+
 .week-col li {
   display: grid;
-  gap: 2px;
-  margin-top: 10px;
+  gap: 1px;
+  margin-top: 6px;
 }
 
 .week-col time,
@@ -497,7 +505,7 @@
 
 .week-col time {
   color: var(--accent);
-  font-size: 15px;
+  font-size: 13px;
 }
 
 .week-col p,
@@ -506,7 +514,13 @@
 .rank li span,
 .video p {
   margin: 0;
-  font-size: 16px;
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.week-col .person {
+  transform: scale(0.9);
+  transform-origin: left center;
 }
 
 .month {
@@ -660,11 +674,22 @@
   grid-template-rows: repeat(2, minmax(0, 1fr));
 }
 
-.momente--dense .momente-stage,
-.momente--overflow .momente-stage {
+.momente--dense .momente-stage {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   grid-template-rows: repeat(2, minmax(0, 1fr));
   gap: 10px;
+}
+
+.momente--gallery .momente-stage {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.momente--packed .momente-stage {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-rows: repeat(3, minmax(0, 1fr));
+  gap: 6px;
 }
 
 .momente-spot {
@@ -740,8 +765,20 @@
 }
 
 .momente--dense .momente-spot h3,
-.momente--overflow .momente-spot h3 {
+.momente--gallery .momente-spot h3,
+.momente--packed .momente-spot h3 {
   font-size: 26px;
+}
+
+.momente--gallery .momente-spot,
+.momente--packed .momente-spot {
+  padding: 14px 16px;
+  gap: 4px;
+}
+
+.momente--gallery .momente-spot h3,
+.momente--packed .momente-spot h3 {
+  font-size: 20px;
 }
 
 .momente-count {
@@ -768,8 +805,14 @@
 }
 
 .momente--dense .momente-digits,
-.momente--overflow .momente-digits {
+.momente--gallery .momente-digits,
+.momente--packed .momente-digits {
   font-size: 48px;
+}
+
+.momente--gallery .momente-digits,
+.momente--packed .momente-digits {
+  font-size: 36px;
 }
 
 .momente-unit {
@@ -788,8 +831,14 @@
 }
 
 .momente--dense .momente-due,
-.momente--overflow .momente-due {
+.momente--gallery .momente-due,
+.momente--packed .momente-due {
   font-size: 18px;
+}
+
+.momente--gallery .momente-due,
+.momente--packed .momente-due {
+  font-size: 15px;
 }
 
 .momente-note {
@@ -798,8 +847,19 @@
 }
 
 .momente--dense .momente-note,
-.momente--overflow .momente-note {
+.momente--gallery .momente-note,
+.momente--packed .momente-note {
   display: none;
+}
+
+.momente--gallery .momente-kind,
+.momente--packed .momente-kind {
+  font-size: 13px;
+}
+
+.momente--gallery .momente-unit,
+.momente--packed .momente-unit {
+  font-size: 16px;
 }
 
 @keyframes momente-in {
@@ -1122,6 +1182,52 @@
 .vision-card .hero-num {
   font-size: 56px;
   letter-spacing: -0.04em;
+}
+
+.vision-card.font-sm .card-kicker,
+.vision-card.font-sm .recap-text,
+.vision-card.font-sm li,
+.vision-card.font-sm p {
+  font-size: 14px;
+}
+
+.vision-card.font-sm h2 {
+  font-size: 26px;
+}
+
+.vision-card.font-sm .hero-num {
+  font-size: 44px;
+}
+
+.vision-card.font-sm .script {
+  font-size: 30px;
+}
+
+.vision-card.font-sm .photo-caption {
+  font-size: 18px;
+}
+
+.vision-card.font-lg .card-kicker,
+.vision-card.font-lg .recap-text,
+.vision-card.font-lg li,
+.vision-card.font-lg p {
+  font-size: 18px;
+}
+
+.vision-card.font-lg h2 {
+  font-size: 38px;
+}
+
+.vision-card.font-lg .hero-num {
+  font-size: 68px;
+}
+
+.vision-card.font-lg .script {
+  font-size: 48px;
+}
+
+.vision-card.font-lg .photo-caption {
+  font-size: 26px;
 }
 
 .vision-card .script {
