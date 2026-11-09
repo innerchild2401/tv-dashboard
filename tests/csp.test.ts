@@ -11,7 +11,8 @@ describe("content security policy", () => {
     assert.equal(isTvDocument("/remote"), false);
     const tv = contentSecurityPolicy({ pathname: "/tv", nonce, development: false });
     const headers = documentSecurityHeaders({ pathname: "/tv", nonce, development: false });
-    assert.equal(tv.includes("frame-ancestors"), false);
+    assert.match(tv, /frame-ancestors \*/);
+    assert.equal(tv.includes("frame-ancestors 'none'"), false);
     assert.equal(
       headers.some((header) => header.key.toLowerCase() === "x-frame-options"),
       false,

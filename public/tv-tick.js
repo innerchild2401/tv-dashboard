@@ -2,6 +2,9 @@
  * ES5 only: Next/React bundles may fail to parse on old Cast Chromium.
  * Keeps the wall clock moving and advances to the next view when React never mounts
  * (or mounts but fails to rotate past dwell).
+ *
+ * Hard rule: when React is live, never full-navigate for rotation (DashCast URL churn /
+ * force=true relaunch flash). Soft-rotate via a tv-rotate event → /api/state instead.
  */
 (function () {
   var TIME_ZONE = "Europe/Bucharest";
@@ -12,6 +15,9 @@
   var DESIGN_H = 720;
   var SAFE_FRACTION = 0.9;
   var advancedUntil = "";
+  var softAskedUntil = "";
+  var softAskedAt = 0;
+  var SOFT_RETRY_MS = 15000;
 
   function fitScale() {
     var width = Math.max(1, window.innerWidth || 0) * SAFE_FRACTION;
@@ -91,6 +97,25 @@
     }
   }
 
+  function requestSoftRotate(until) {
+    var now = Date.now();
+    /* Retry while overdue so a single failed /api/state does not stick the screen. */
+    if (until && until === softAskedUntil && now - softAskedAt < SOFT_RETRY_MS) return;
+    softAskedUntil = until || softAskedUntil;
+    softAskedAt = now;
+    try {
+      if (typeof CustomEvent === "function") {
+        document.dispatchEvent(new CustomEvent("tv-rotate"));
+        return;
+      }
+    } catch (err) {}
+    try {
+      var event = document.createEvent("Event");
+      event.initEvent("tv-rotate", true, true);
+      document.dispatchEvent(event);
+    } catch (err2) {}
+  }
+
   function paintDwell(node, now) {
     if (!node) return;
     var until = node.getAttribute("data-until");
@@ -107,9 +132,15 @@
       }
     }
 
-    /* When React is live it rotates via /api/state — never full-navigate (DashCast flash). */
-    if (live) return;
     if (holdActive(node)) return;
+
+    /* React owns soft rotation via /api/state. Nudge it if dwell is overdue. */
+    if (live) {
+      if (now < end + 5000) return;
+      requestSoftRotate(until);
+      return;
+    }
+
     if (now < end) return;
     if (until === advancedUntil) return;
     advancedUntil = until;
@@ -175,8 +206,9 @@
     if (label !== lastLabel) {
       lastLabel = label;
       lastAdvance = now;
-    } else if (now - lastAdvance > STUCK_MS && !reactLive(node)) {
-      advanceToNext(node);
+    } else if (now - lastAdvance > STUCK_MS) {
+      if (reactLive(node)) requestSoftRotate(node && node.getAttribute("data-until"));
+      else advanceToNext(node);
     }
   }
 
@@ -188,6 +220,8 @@
 
   function onWake() {
     lastAdvance = Date.now();
+    softAskedUntil = "";
+    softAskedAt = 0;
     applyFit();
     tick();
   }

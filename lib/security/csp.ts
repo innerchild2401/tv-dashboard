@@ -34,7 +34,10 @@ export function contentSecurityPolicy(options: { pathname: string; nonce: string
     "form-action 'self'",
     "frame-src 'none'",
   ];
-  if (!isTvDocument(options.pathname)) directives.push("frame-ancestors 'none'");
+  // /tv must stay embeddable for DashCast iframe (force=false). Explicit allow-all
+  // documents the contract; other routes stay unframeable.
+  if (isTvDocument(options.pathname)) directives.push("frame-ancestors *");
+  else directives.push("frame-ancestors 'none'");
   if (!options.development) directives.push("upgrade-insecure-requests");
   return directives.join("; ");
 }

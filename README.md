@@ -277,6 +277,13 @@ Acasă (view id `home`) is a post-it board of tasks, grocery items, and family m
 
 ### Chromecast / Pi notes (flicker)
 
-View rotation must stay inside the page (`/api/state`). Do not re-cast on every view change. On the Pi (`/etc/tv-agent.toml`), keep `dashcast_force = false` and a high `dashcast_reload_seconds` (default 1800) so DashCast only self-reloads for freeze recovery — each forced `load_url` flashes the DashCast splash. After pulling a new `pi-agent`, restart `tv-agent`. No token values belong in git.
+Hard rules from pychromecast `DashCastController` / AlexxIT DashCast:
+
+- **`dashcast_force = false`** on the Pi. `force=true` disables `reload_seconds` and makes every later `load_url()` relaunch the DashCast app (the splash flash). `/tv` allows iframe embedding (`frame-ancestors *`, no `X-Frame-Options`).
+- **Cast once; rotate in-page** via `/api/state`. Never `load_url` for Azi→Week→… or as keepalive. Recast only on cold start / idle / truly wrong dashboard / explicit `cast_now`.
+- **`dashcast_reload_seconds = 1800`** (or 300–540 if Cast idle-timeouts are aggressive) with `force=false` for soft page reload. Leave `dashboard_refresh_seconds = 0` — that path is a Pi re-cast for `force=true` only.
+- Stuck views are a client/rotation bug — fix soft advance, do not “un-stick” with DashCast relaunch.
+
+After pulling a new `pi-agent`, restart `tv-agent`. Heartbeat `version` should read `2` or newer on `/remote/system`. No token values belong in git.
 
 A manual or locked row is left unchanged. A priority needs a one-line reason and expires at the end of the day in Europe/Bucharest unless another time is sent. A manual priority wins. `route_inbox_item` creates an event only when the text has a date and a time. Otherwise it creates a task, or leaves the item as needs review when the destination is unclear. A win or progress card needs `evidence` such as `task:done:<id>`. `undo` restores one of the last 50 assistant writes, and it refuses when a later manual edit is holding that row. `/remote/system` lists those writes and can undo one.

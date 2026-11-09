@@ -97,8 +97,11 @@ def _load_url(cast, url: str, timeout: float, force: bool, reload_seconds: int) 
         failed["value"] = not msg_sent
         done.set()
 
-    # DashCast ignores reload_seconds when force=True (see pychromecast DashCastController).
-    # Prefer force=False + reload_seconds so a frozen page recovers without the Pi re-casting.
+    # Upstream DashCastController:
+    # - force=True disables reload_seconds AND makes every later load_url() relaunch the app (splash).
+    # - force=False loads in an iframe; reload_seconds soft-reloads the page; controllers stay in control.
+    # Call this only for cold start / wrong dashboard — never for view rotation or keepalive.
+    # Await the launch callback before considering the cast up (no double load_url).
     reload = 0 if force else max(0, reload_seconds)
     controller.load_url(url, force=force, reload_seconds=reload, callback_function=callback)
     if not done.wait(timeout):
