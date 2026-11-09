@@ -16,12 +16,14 @@ heartbeat_seconds = 60
 backoff_cap_seconds = 300
 discovery_timeout_seconds = 5
 
-# DashCast: force=true helps sites that block iframes, but it disables reload_seconds
-# and flashes the DashCast splash on every load_url. Prefer force=false.
-# This app allows framing /tv, so force stays false.
-# reload_seconds recovers a frozen page; keep it high (30–60 min) to avoid mid-rotation splash.
-# View rotation happens inside the page via /api/state — do not rely on Pi re-casts for that.
+# DashCast hard rules (pychromecast DashCastController + AlexxIT/DashCast):
+# - force=true disables reload_seconds AND relaunches the DashCast app on every later
+#   load_url() → the splash flash. Prefer force=false; /tv allows iframe embedding.
+# - Never load_url for view rotation or keepalive. Rotate in-page via /api/state.
+# - reload_seconds (force=false only) soft-reloads the page for freeze/idle recovery.
+#   1800 = 30 min. 300–540 is fine if Cast idle-timeouts are aggressive.
+# - dashboard_refresh_seconds re-casts the same URL from the Pi — only for force=true
+#   (no receiver reload). Leave 0 when force=false. Never use periodic force-recast.
 dashcast_force = false
 dashcast_reload_seconds = 1800
-# Only needed when dashcast_force = true (DashCast will not self-reload). Leave 0 otherwise.
 dashboard_refresh_seconds = 0

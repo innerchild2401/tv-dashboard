@@ -13,6 +13,7 @@ from tv_agent.decide import (
     Settings,
     Sight,
     note_failure,
+    same_dashboard,
     should_look,
 )
 from tv_agent.http_client import scrub
@@ -104,6 +105,33 @@ class WatchdogTest(unittest.TestCase):
         casts = []
         tick(Memory(), 0, wrong, [], casts, [])
         self.assertEqual(casts, [0])
+
+    def test_view_query_and_missing_token_do_not_trigger_recast(self):
+        """Classic ?view= navigation must not look like dashboard_wrong (DashCast splash)."""
+        self.assertTrue(same_dashboard(URL, URL + "&view=week"))
+        self.assertTrue(same_dashboard(URL + "&view=today", "https://tv.example/tv?view=momente&token=secret"))
+        self.assertTrue(same_dashboard(URL, "https://tv.example/tv"))
+        self.assertFalse(same_dashboard(URL, "https://other.example/tv?token=secret"))
+        self.assertFalse(same_dashboard(URL, "https://tv.example/tv?token=other"))
+
+        memory = Memory()
+        casts = []
+        rotated = Sight(
+            looked=True,
+            found=True,
+            app_id=DASH_APP_ID,
+            app_name="DashCast",
+            dash_url=URL + "&view=week",
+        )
+        for now in range(0, 181, 15):
+            tick(memory, now, rotated, [], casts, [])
+        self.assertEqual(casts, [])
+
+        # DashCast app up, URL unknown → stay put (do not splash-recast).
+        unknown = Sight(looked=True, found=True, app_id=DASH_APP_ID, app_name="DashCast", dash_url=None)
+        casts = []
+        tick(Memory(), 0, unknown, [], casts, [])
+        self.assertEqual(casts, [])
 
     def test_dashboard_refresh_re_casts_when_configured(self):
         showing = Sight(looked=True, found=True, app_id=DASH_APP_ID, app_name="DashCast", dash_url=URL)

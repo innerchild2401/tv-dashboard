@@ -10,7 +10,7 @@ import { ro } from "@/i18n/ro";
 import type { TvState } from "@/lib/state/types";
 import { tvFitScale } from "@/lib/tv/fit";
 import { NIGHTLY_RELOAD_KEY, nightlyReloadKey, shouldNightlyReload } from "@/lib/tv/reload";
-import { POLL_MS, nextTvState, tvPathWithView, withLiveClock } from "@/lib/tv/session";
+import { POLL_MS, nextTvState, tvStatePath, withLiveClock } from "@/lib/tv/session";
 import { CLOCK_MS, delayUntil, onTvWake, scheduleEvery } from "@/lib/tv/timers";
 import { Chrome } from "@/components/tv/chrome";
 
@@ -26,33 +26,61 @@ export function TvScreen({
   const [state, setState] = useState(initial);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [live, setLive] = useState(false);
-  const refetchRef = useRef<(opts?: { rotateFallback?: boolean }) => void>(() => {});
+  const refetchRef = useRef<(opts?: { rotate?: boolean }) => void>(() => {});
   const rootRef = useRef<HTMLElement | null>(null);
   const stateRef = useRef(state);
+  const rotatingRef = useRef(false);
   stateRef.current = state;
 
   useEffect(() => {
-    const pull = async (opts?: { rotateFallback?: boolean }) => {
+    const softFallback = async (current: TvState, headers: Headers) => {
+      try {
+        const response = await fetch(tvStatePath(), { headers, cache: "no-store" });
+        if (!response.ok) return;
+        const body: unknown = await response.json();
+        const next = nextTvState(current, body);
+        if (next.currentView !== current.currentView || next.until !== current.until) {
+          setState(next);
+        }
+      } catch {
+        // Still stuck — classic tv-tick may full-nav; Pi ignores ?view= so no splash.
+      }
+    };
+
+    const pull = async (opts?: { rotate?: boolean }) => {
       const current = stateRef.current;
+      if (opts?.rotate && (current.hold === "paused" || current.hold === "locked")) return;
+      if (opts?.rotate && rotatingRef.current) return;
+      if (opts?.rotate) rotatingRef.current = true;
       try {
         const headers = new Headers();
         if (token) headers.set("Authorization", `Bearer ${token}`);
-        const response = await fetch(statePath(), { headers, cache: "no-store" });
+        // Soft advance: ask /api/state for the successor. Never change window.location
+        // for rotation — that churns the Cast URL and (with force=true) relaunches DashCast.
+        const path = opts?.rotate ? tvStatePath(current.nextView) : tvStatePath();
+        const response = await fetch(path, { headers, cache: "no-store" });
         if (!response.ok) {
-          if (opts?.rotateFallback) advanceByUrl(current);
+          if (opts?.rotate) await softFallback(current, headers);
           return;
         }
         const body: unknown = await response.json();
         const next = nextTvState(current, body);
-        if (opts?.rotateFallback && next.until === current.until && next.currentView === current.currentView) {
-          advanceByUrl(current);
+        if (
+          opts?.rotate &&
+          next.currentView === current.currentView &&
+          next.until === current.until
+        ) {
+          await softFallback(current, headers);
           return;
         }
         setState(next);
       } catch {
-        if (opts?.rotateFallback) advanceByUrl(current);
+        // Leave the last good frame up; poll / dwell / tv-tick will retry.
+      } finally {
+        if (opts?.rotate) rotatingRef.current = false;
       }
     };
+
     refetchRef.current = (opts) => {
       void pull(opts);
     };
@@ -86,7 +114,7 @@ export function TvScreen({
 
   useEffect(() => {
     if (state.hold === "paused" || state.hold === "locked") return;
-    return delayUntil(new Date(state.until).getTime(), () => refetchRef.current({ rotateFallback: true }));
+    return delayUntil(new Date(state.until).getTime(), () => refetchRef.current({ rotate: true }));
   }, [state.until, state.hold]);
 
   useEffect(() => {
@@ -95,6 +123,13 @@ export function TvScreen({
       setLive(true);
       refetchRef.current();
     });
+  }, []);
+
+  useEffect(() => {
+    // Classic tv-tick asks React to soft-rotate when dwell is overdue (stuck screen).
+    const onRotate = () => refetchRef.current({ rotate: true });
+    document.addEventListener("tv-rotate", onRotate);
+    return () => document.removeEventListener("tv-rotate", onRotate);
   }, []);
 
   useEffect(() => {
@@ -188,14 +223,4 @@ function ViewBody({ state }: { state: TvState }) {
   if (state.currentView === "vision" && state.vision) return <VisionView view={state.vision} />;
   if (state.currentView === "home" && state.home) return <HomeView view={state.home} />;
   return null;
-}
-
-function statePath(): string {
-  // Prefer unforced live rotation via /api/state. Cast SSR uses ?view= on full navigation.
-  return "/api/state";
-}
-
-function advanceByUrl(state: TvState) {
-  if (state.hold === "paused" || state.hold === "locked") return;
-  window.location.assign(tvPathWithView(window.location.href, state.nextView));
 }

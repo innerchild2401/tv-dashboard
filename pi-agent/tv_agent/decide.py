@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+from urllib.parse import parse_qsl, urlsplit
 
 IDLE_APP_ID = "E8C28D3C"
 DASH_APP_ID = "84912283"
-AGENT_VERSION = "1"
+# Bump when cast-matching / no-flash rules change so /remote/system shows the Pi got the update.
+AGENT_VERSION = "2"
 
 
 @dataclass(frozen=True)
@@ -62,12 +63,25 @@ class Step:
 
 
 def same_dashboard(left: str | None, right: str | None) -> bool:
+    """True when both URLs are this TV dashboard.
+
+    Ignores ephemeral query keys such as ``view`` so in-page / classic rotation
+    never looks like a foreign DashCast URL. Token is compared only when both
+    sides include one (some receivers omit it from the reported URL).
+    """
     if not left or not right:
         return False
-    return _norm(left) == _norm(right)
+    a = _parts(left)
+    b = _parts(right)
+    if a["origin"] != b["origin"] or a["path"] != b["path"]:
+        return False
+    if a["token"] and b["token"] and a["token"] != b["token"]:
+        return False
+    return True
 
 
 def classify(sight: Sight, expected_url: str, last_cast_url: str | None) -> str:
+    """Classify the receiver. Prefer app_id over media "off" — DashCast can look idle while still showing."""
     app_id = (sight.app_id or "").upper()
     name = (sight.app_name or "").casefold()
     if app_id in ("", IDLE_APP_ID) or name in {"backdrop", "default media receiver"}:
@@ -75,11 +89,14 @@ def classify(sight: Sight, expected_url: str, last_cast_url: str | None) -> str:
             return "backdrop"
         return "idle"
     if app_id == DASH_APP_ID or name == "dashcast":
+        # Already on DashCast: only replace when the URL is a different dashboard.
+        # Never treat a live session as dead just because the player looks "off".
         if sight.dash_url:
             return "dashboard" if same_dashboard(sight.dash_url, expected_url) else "dashboard_wrong"
         if last_cast_url and same_dashboard(last_cast_url, expected_url):
             return "dashboard"
-        return "dashboard_wrong"
+        # App is DashCast but URL unknown after restart — trust the app, do not re-cast.
+        return "dashboard"
     return "other"
 
 
@@ -143,6 +160,9 @@ def plan(
 
     receiver = memory.receiver
     auto = False
+    # Hard rule: never load_url for view rotation / keepalive while DashCast is already
+    # showing this dashboard. Recast only cold start (idle/backdrop), wrong URL, or
+    # explicit cast_now. dashboard_refresh_seconds is a force=true fallback only.
     if receiver in {"idle", "backdrop"}:
         auto = memory.idle_for >= settings.idle_seconds and now >= memory.hands_off_until and now >= memory.backoff_until
     elif receiver == "dashboard_wrong":
@@ -205,9 +225,13 @@ def _short(value: str | None) -> str | None:
     return trimmed[:80] if trimmed else None
 
 
-def _norm(url: str) -> str:
+def _parts(url: str) -> dict[str, str]:
     parts = urlsplit(url.strip())
-    query = [(key, item) for key, item in parse_qsl(parts.query, keep_blank_values=True)]
-    query.sort()
+    token = ""
+    for key, item in parse_qsl(parts.query, keep_blank_values=True):
+        if key.casefold() == "token":
+            token = item
+            break
     path = parts.path.rstrip("/") or "/"
-    return urlunsplit((parts.scheme.lower(), parts.netloc.lower(), path, urlencode(query), ""))
+    origin = f"{parts.scheme.lower()}://{parts.netloc.lower()}"
+    return {"origin": origin, "path": path, "token": token}

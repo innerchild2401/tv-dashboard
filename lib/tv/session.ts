@@ -4,6 +4,12 @@ import { formatClock, formatDuration } from "@/lib/time/bucharest";
 
 export const POLL_MS = 30_000;
 
+/** Soft rotation endpoint. Pass `view` only when advancing after dwell — never change the Cast URL. */
+export function tvStatePath(view?: ViewId | null): string {
+  if (!view) return "/api/state";
+  return `/api/state?view=${encodeURIComponent(view)}`;
+}
+
 export function isTvState(value: unknown): value is TvState {
   if (!value || typeof value !== "object") return false;
   const record = value as { ok?: unknown; currentView?: unknown; nextView?: unknown; until?: unknown; chrome?: unknown };

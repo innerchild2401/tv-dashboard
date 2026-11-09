@@ -5,7 +5,7 @@ import { nextInOrder, peekNextView, prepareCandidates, resolveRotation, type Rot
 import { availability, sourceIsStale } from "../lib/state/availability";
 import { buildTvState } from "../lib/state/build";
 import { sampleSnapshot } from "../lib/state/sample";
-import { nextTvState, tvPathWithView } from "../lib/tv/session";
+import { nextTvState, tvPathWithView, tvStatePath } from "../lib/tv/session";
 import { shouldNightlyReload } from "../lib/tv/reload";
 import { zonedTimeToUtc } from "../lib/time/bucharest";
 
@@ -147,6 +147,8 @@ describe("state fallbacks", () => {
     assert.ok(state.nextView);
     assert.notEqual(state.nextView, "today");
     assert.equal(tvPathWithView("/tv?token=abc", state.nextView), `/tv?token=abc&view=${state.nextView}`);
+    assert.equal(tvStatePath(), "/api/state");
+    assert.equal(tvStatePath(state.nextView), `/api/state?view=${state.nextView}`);
 
     const chained = buildTvState(sampleSnapshot(now), now, state.nextView);
     assert.equal(chained.currentView, state.nextView);

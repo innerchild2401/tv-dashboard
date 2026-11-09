@@ -12,9 +12,10 @@ describe("tv-tick Cast fallback", () => {
     assert.match(source, /location\.assign/);
   });
 
-  it("does not full-navigate while React is live (avoids DashCast flash)", () => {
-    assert.match(source, /When React is live it rotates via \/api\/state/);
-    assert.match(source, /if \(live\) return;/);
+  it("soft-rotates while React is live instead of full-navigating (avoids DashCast flash)", () => {
+    assert.match(source, /tv-rotate/);
+    assert.match(source, /requestSoftRotate/);
+    assert.match(source, /React owns soft rotation via \/api\/state/);
     assert.doesNotMatch(source, /var grace = live \? LIVE_GRACE_MS : 0;/);
   });
 
