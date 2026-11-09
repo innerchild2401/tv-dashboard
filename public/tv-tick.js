@@ -7,7 +7,6 @@
   var TIME_ZONE = "Europe/Bucharest";
   var TICK_MS = 1000;
   var STUCK_MS = 90000;
-  var LIVE_GRACE_MS = 5000;
   /* Keep in sync with lib/tv/fit.ts — design canvas + Cast overscan safe area. */
   var DESIGN_W = 1280;
   var DESIGN_H = 720;
@@ -108,9 +107,10 @@
       }
     }
 
+    /* When React is live it rotates via /api/state — never full-navigate (DashCast flash). */
+    if (live) return;
     if (holdActive(node)) return;
-    var grace = live ? LIVE_GRACE_MS : 0;
-    if (now < end + grace) return;
+    if (now < end) return;
     if (until === advancedUntil) return;
     advancedUntil = until;
     advanceToNext(node);

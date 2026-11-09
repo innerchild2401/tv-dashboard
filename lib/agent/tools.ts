@@ -1,5 +1,12 @@
 import { z } from "zod";
 import { argsHash } from "@/lib/agent/auth";
+import {
+  VISION_DESIGN,
+  clampVisionGrid,
+  parseFontScale,
+  viewDesignPayload,
+  type FontScale,
+} from "@/lib/agent/design";
 import { SupabaseStore } from "@/lib/agent/db";
 import { MemoryStore } from "@/lib/agent/memory";
 import {
@@ -38,7 +45,7 @@ import { cardSchema, paletteTokenSchema } from "@/lib/schemas";
 import { endOfZonedDay, zonedParts, zonedTimeToUtc } from "@/lib/time/bucharest";
 import type { DisplayControl } from "@/lib/remote/hold";
 
-const READS = new Set<ToolName>(["get_dashboard_state", "get_schema", "get_inbox"]);
+const READS = new Set<ToolName>(["get_dashboard_state", "get_schema", "get_view_design", "get_inbox"]);
 const KIND_COLOR: Record<CardKind, Palette> = {
   photo: "coral",
   affirmation: "pink",
@@ -51,6 +58,12 @@ const KIND_COLOR: Record<CardKind, Palette> = {
 };
 
 const emptyInput = z.object({});
+const designInput = z.object({
+  viewId: z
+    .enum(["today", "week", "momente", "vision", "home"])
+    .optional()
+    .describe("Optional view id. Omit to receive constraints for every rotating view."),
+});
 const cardInput = z.object({
   externalId: z.string().trim().min(1).max(200).describe("Stable idempotency key. The same value updates the existing card."),
   viewId: z.string().trim().min(1).max(40).optional().describe('Defaults to "vision" (Victorii / vision board).'),
@@ -58,14 +71,33 @@ const cardInput = z.object({
   title: z.string().max(200).optional(),
   body: z.string().max(500).optional(),
   color: paletteTokenSchema.optional(),
-  data: z.record(z.string(), z.unknown()).optional().describe("Kind-specific fields. For photo cards use data.alt; storagePath is set server-side."),
+  tilt: z
+    .number()
+    .min(VISION_DESIGN.tilt.min)
+    .max(VISION_DESIGN.tilt.max)
+    .optional()
+    .describe("Card tilt in degrees, -3…3."),
+  grid: z
+    .object({
+      col: z.number().int().min(0).max(3),
+      row: z.number().int().min(0).max(2),
+      colSpan: z.number().int().min(1).max(VISION_DESIGN.span.colSpanMax).optional(),
+      rowSpan: z.number().int().min(1).max(VISION_DESIGN.span.rowSpanMax).optional(),
+    })
+    .optional()
+    .describe("4×3 Victorii grid placement. col+colSpan≤4, row+rowSpan≤3."),
+  fontScale: z.enum(["sm", "md", "lg"]).optional().describe("Constrained text size: sm|md|lg."),
+  data: z
+    .record(z.string(), z.unknown())
+    .optional()
+    .describe("Kind-specific fields. For photo cards use data.alt; storagePath is set server-side. fontScale may also live here."),
   expiresAt: z.string().max(40).optional(),
   image_url: z
     .string()
     .max(2000)
     .optional()
     .describe(
-      "HTTPS URL of a jpeg/png/webp/gif (max 5 MB). Only for kind=photo. The server downloads it into the private photos bucket and sets data.storagePath. Prefer https://. Rejects non-images and oversized files.",
+      "HTTPS URL of a jpeg/png/webp/gif (max 5 MB). Only for kind=photo. The server downloads it into the private photos bucket and sets data.storagePath. Prefer https://. Rejects non-images and oversized files. Photos always use the polaroid frame.",
     ),
 });
 const deleteInput = z.object({
@@ -195,10 +227,23 @@ export const TOOL_CATALOG: { name: ToolName; title: string; description: string;
     name: "get_schema",
     title: "Schemas for Grokbot",
     description:
-      "Return contracts for Vision cards, Momente spotlights, and Acasă (home) post-its: upsert_task/delete_task, shopping_add/shopping_check/shopping_delete, upsert_message/delete_message. Romanian text ok. Same externalId updates.",
+      "Return contracts for every rotating view plus design constraints. Prefer get_view_design first when laying out Victorii. Covers Vision cards (grid/tilt/fontScale), Momente spotlights, Acasă post-its. Romanian text ok. Same externalId updates.",
     input: emptyInput,
   },
-  { name: "upsert_card", title: "Upsert card", description: "Create or update a card on Victorii (viewId vision). The same externalId updates the existing card. A manual or locked card is refused. A win or progress card needs evidence. For a photo, pass kind=photo and image_url (HTTPS); the server stores it in the private photos bucket.", input: cardInput },
+  {
+    name: "get_view_design",
+    title: "Per-view design constraints",
+    description:
+      "Call this before editing a TV view. Returns hard constraints and allowed design knobs for today|week|momente|vision|home (or all views). Stay inside the limits — no free-form HTML. Auth remains Bearer AGENT_TOKEN on /mcp.",
+    input: designInput,
+  },
+  {
+    name: "upsert_card",
+    title: "Upsert card",
+    description:
+      "Create or update a Victorii card (viewId vision). Pass layout knobs: grid {col,row,colSpan?,rowSpan?}, tilt (-3…3), fontScale (sm|md|lg). Photos always use the polaroid frame. Same externalId updates. Manual/locked refused. Wins/progress need evidence. Photo: kind=photo + image_url (HTTPS).",
+    input: cardInput,
+  },
   { name: "delete_card", title: "Delete card", description: "Soft-delete a card the assistant owns. Pass id or externalId.", input: deleteInput },
   {
     name: "upsert_spotlight",
@@ -328,6 +373,7 @@ export async function executeTool(
 async function dispatch(store: AgentStore, name: ToolName, args: unknown, now: Date, fetchImage: ImageFetch): Promise<Outcome> {
   if (name === "get_dashboard_state") return stateOf(store, now);
   if (name === "get_schema") return schemaOf();
+  if (name === "get_view_design") return designOf(args);
   if (name === "upsert_card") return upsertCard(store, args, now, fetchImage);
   if (name === "delete_card") return deleteCard(store, args, now);
   if (name === "upsert_spotlight") return upsertSpotlight(store, args);
@@ -428,7 +474,7 @@ function schemaOf(): Outcome {
                 kind: "trip | competition | deadline | other (default other)",
                 startsAt: "ISO date/time string, required",
                 note: "optional string or null",
-                pinned: "optional boolean — keep when more than 6 spotlights",
+                pinned: "optional boolean — sort pinned first",
               },
               example: {
                 externalId: "trip-ski-2027",
@@ -446,13 +492,16 @@ function schemaOf(): Outcome {
           },
           clearSamples:
             "Seeded sample external ids: spotlight-vacanta-sample, spotlight-deadline-sample. Call delete_spotlight on those to clear Cast samples.",
+          maxVisible: 12,
+          showAllActive: true,
+          layoutNote: "Layouts: 1 solo, 2 split, 3–4 tiles, 5–6 dense, 7–9 gallery, 10–12 packed. Soft cap 12.",
         },
         photos: {
           viewId: "vision",
           labelRo: "Victorii",
           tool: "upsert_card",
           description:
-            "Attach a photo to a Victorii card by passing kind=photo and image_url. The server downloads the image over HTTPS into the private photos bucket and writes data.storagePath. Phone remote uploads still set storagePath the same way.",
+            "Attach a photo to a Victorii card by passing kind=photo and image_url. The server downloads the image over HTTPS into the private photos bucket and writes data.storagePath. Photos always render in the polaroid frame. Phone remote uploads still set storagePath the same way.",
           params: {
             externalId: "string, required, stable idempotency key",
             viewId: 'optional, defaults to "vision"',
@@ -460,7 +509,10 @@ function schemaOf(): Outcome {
             title: "optional caption shown under the polaroid on TV",
             body: "optional",
             color: "optional palette token; photo frame uses paper styling on TV",
-            data: { alt: "optional string, max 200" },
+            grid: "{ col 0–3, row 0–2, colSpan 1–2, rowSpan 1–2 }",
+            tilt: "-3…3 degrees",
+            fontScale: "sm | md | lg",
+            data: { alt: "optional string, max 200", fontScale: "optional sm|md|lg" },
             expiresAt: "optional ISO date/time",
             image_url: "HTTPS URL, required to attach/replace the image. jpeg/png/webp/gif, max 5 MB. Non-images are refused.",
           },
@@ -470,6 +522,9 @@ function schemaOf(): Outcome {
             kind: "photo",
             title: "Vacanță",
             image_url: "https://cdn.example/vacation.jpg",
+            grid: { col: 0, row: 0, colSpan: 2, rowSpan: 2 },
+            tilt: -2,
+            fontScale: "md",
             data: { alt: "Familie la munte" },
           },
           notes: [
@@ -477,8 +532,10 @@ function schemaOf(): Outcome {
             "image_url is only valid when kind is photo.",
             "Updating the same externalId with a new image_url replaces storagePath.",
             "Omitting image_url keeps the existing photo when the card already has one.",
+            "No free-form HTML — layout knobs only.",
           ],
         },
+        design: viewDesignPayload(),
         home: {
           viewId: "home",
           labelRo: "Acasă",
@@ -550,11 +607,21 @@ function schemaOf(): Outcome {
           "A manual or locked row is left unchanged.",
           "A priority needs a reason and expires at the end of the day unless another time is given.",
           "Momente spotlights use upsert_spotlight / delete_spotlight. Day countdown is Bucharest calendar days, not hours.",
-          "Victorii photo cards: kind=photo + image_url (HTTPS). Server stores into the private photos bucket.",
+          "Victorii photo cards: kind=photo + image_url (HTTPS). Server stores into the private photos bucket. Pass grid/tilt/fontScale for layout.",
           "Acasă post-its: tasks via upsert_task/delete_task, groceries via shopping_add/shopping_check/shopping_delete, messages via upsert_message/delete_message.",
+          "Call get_view_design (or get_schema.design) before editing a view. Stay inside constraints — no free-form HTML.",
         ],
       },
     }),
+  };
+}
+
+function designOf(args: unknown): Outcome {
+  const input = read(designInput, args);
+  if (!input.ok) return input.outcome;
+  return {
+    undo: null,
+    result: success(null, [], { schema: viewDesignPayload(input.value.viewId) }),
   };
 }
 
@@ -587,8 +654,41 @@ async function upsertCard(store: AgentStore, args: unknown, now: Date, fetchImag
     if (!image.ok) return no(image.reason);
     data = { ...data, storagePath: await store.saveImage(image.bytes, image.type) };
   }
-  const spot = existing ? { col: existing.gridCol, row: existing.gridRow } : place(cards, viewId);
-  if (!existing && occupied(cards, viewId, spot.col, spot.row)) warnings.push("the board is full, so the card overlaps another");
+
+  const liveVision = active(cards).filter((card) => card.viewId === viewId && card.id !== existing?.id);
+  if (!existing && liveVision.length >= VISION_DESIGN.maxCards) {
+    return no(`Victorii allows at most ${VISION_DESIGN.maxCards} cards`);
+  }
+
+  let grid = {
+    col: existing?.gridCol ?? 0,
+    row: existing?.gridRow ?? 0,
+    colSpan: existing?.gridColSpan ?? 1,
+    rowSpan: existing?.gridRowSpan ?? 1,
+  };
+  if (value.grid) {
+    const clamped = clampVisionGrid({
+      col: value.grid.col,
+      row: value.grid.row,
+      colSpan: value.grid.colSpan ?? grid.colSpan,
+      rowSpan: value.grid.rowSpan ?? grid.rowSpan,
+    });
+    if (!clamped) return no("grid must fit the 4×3 Victorii board (spans max 2)");
+    grid = clamped;
+  } else if (!existing) {
+    const spot = place(cards, viewId);
+    grid = { col: spot.col, row: spot.row, colSpan: 1, rowSpan: 1 };
+  }
+  if (occupied(cards, viewId, grid.col, grid.row, existing?.id ?? null, grid.colSpan, grid.rowSpan)) {
+    warnings.push("the board cell overlaps another card");
+  }
+
+  const tilt = value.tilt ?? existing?.tilt ?? 0;
+  const fontScale: FontScale = value.fontScale
+    ? value.fontScale
+    : parseFontScale(data.fontScale, existing ? parseFontScale(existing.data.fontScale) : "md");
+  data = { ...data, fontScale };
+
   const expiresAt = instantField(value.expiresAt, existing?.expiresAt ?? null);
   if (expiresAt === "bad") return no("expiresAt must be a date and time");
   const draft = {
@@ -598,8 +698,8 @@ async function upsertCard(store: AgentStore, args: unknown, now: Date, fetchImag
     title: value.title === undefined ? (existing?.title ?? null) : value.title || null,
     body: value.body === undefined ? (existing?.body ?? null) : value.body || null,
     color: value.color ?? existing?.color ?? KIND_COLOR[value.kind],
-    tilt: existing?.tilt ?? 0,
-    grid: { col: spot.col, row: spot.row, colSpan: existing?.gridColSpan ?? 1, rowSpan: existing?.gridRowSpan ?? 1 },
+    tilt,
+    grid,
     expiresAt: expiresAt ?? undefined,
     pinned: existing?.pinned ?? false,
     source: "assistant" as const,
@@ -1339,17 +1439,44 @@ function sameControl(left: DisplayControl, right: DisplayControl): boolean {
 }
 
 function place(cards: CardRecord[], viewId: string): { col: number; row: number } {
-  const taken = new Set(active(cards).filter((card) => card.viewId === viewId).map((card) => `${card.gridCol},${card.gridRow}`));
-  for (let row = 0; row < 3; row += 1) {
-    for (let col = 0; col < 4; col += 1) {
+  const taken = new Set<string>();
+  for (const card of active(cards).filter((row) => row.viewId === viewId)) {
+    for (let row = card.gridRow; row < card.gridRow + card.gridRowSpan && row < VISION_DESIGN.grid.rows; row += 1) {
+      for (let col = card.gridCol; col < card.gridCol + card.gridColSpan && col < VISION_DESIGN.grid.columns; col += 1) {
+        taken.add(`${col},${row}`);
+      }
+    }
+  }
+  for (let row = 0; row < VISION_DESIGN.grid.rows; row += 1) {
+    for (let col = 0; col < VISION_DESIGN.grid.columns; col += 1) {
       if (!taken.has(`${col},${row}`)) return { col, row };
     }
   }
   return { col: 0, row: 0 };
 }
 
-function occupied(cards: CardRecord[], viewId: string, col: number, row: number): boolean {
-  return active(cards).some((card) => card.viewId === viewId && card.gridCol === col && card.gridRow === row);
+function occupied(
+  cards: CardRecord[],
+  viewId: string,
+  col: number,
+  row: number,
+  exceptId: string | null = null,
+  colSpan = 1,
+  rowSpan = 1,
+): boolean {
+  return active(cards).some((card) => {
+    if (card.viewId !== viewId) return false;
+    if (exceptId && card.id === exceptId) return false;
+    const left = col;
+    const right = col + colSpan;
+    const top = row;
+    const bottom = row + rowSpan;
+    const otherLeft = card.gridCol;
+    const otherRight = card.gridCol + card.gridColSpan;
+    const otherTop = card.gridRow;
+    const otherBottom = card.gridRow + card.gridRowSpan;
+    return left < otherRight && right > otherLeft && top < otherBottom && bottom > otherTop;
+  });
 }
 
 function missingEvidence(kind: "wins" | "progress", data: Record<string, unknown>): boolean {
@@ -1395,6 +1522,14 @@ function publicCard(card: CardRecord) {
     title: card.title,
     body: card.body,
     color: card.color,
+    tilt: card.tilt,
+    grid: {
+      col: card.gridCol,
+      row: card.gridRow,
+      colSpan: card.gridColSpan,
+      rowSpan: card.gridRowSpan,
+    },
+    fontScale: parseFontScale(card.data.fontScale),
     source: card.source,
     locked: card.locked,
     expiresAt: card.expiresAt,

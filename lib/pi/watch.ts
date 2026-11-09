@@ -11,7 +11,7 @@ export type Receiver = (typeof RECEIVERS)[number];
 export const COMMANDS = ["cast_now", "release", "restart_service"] as const;
 export type CommandKind = (typeof COMMANDS)[number];
 
-const READS = new Set(["get_dashboard_state", "get_schema", "get_inbox", "undo"]);
+const READS = new Set(["get_dashboard_state", "get_schema", "get_view_design", "get_inbox", "undo"]);
 
 const heartbeatSchema = z.object({
   receiver: z.enum(RECEIVERS),

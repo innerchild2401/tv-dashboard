@@ -247,9 +247,13 @@ python3 -m unittest discover -s pi-agent/tests -v
 
 Grokbot calls `/mcp` (stateless Streamable HTTP, tools only). The same handlers are `POST /api/agent/<tool>`. Send `Authorization: Bearer` with `AGENT_TOKEN`. The token cannot change config, the PIN, or other tokens. The assistant can pin a view for at most 30 minutes and cannot lock the screen.
 
-A run calls `get_dashboard_state`, then `get_inbox` and `route_inbox_item` for anything still waiting, then `set_recap`, then `set_priority`, then `upsert_card` for the affirmation, weekly wins, and word of the month, then `upsert_events`, `upsert_task`, and `shopping_add`. Use stable ids such as `recap-2026-11-08`, `affirmation-2026-11-08`, `wins-2026-11-08`, and `word-2026-11-08`. The same id updates the existing row, so the routine can run twice.
+A run calls `get_view_design` (or `get_schema`) first, then `get_dashboard_state`, then `get_inbox` and `route_inbox_item` for anything still waiting, then `set_recap`, then `set_priority`, then `upsert_card` for the affirmation, weekly wins, and word of the month, then `upsert_events`, `upsert_task`, and `shopping_add`. Use stable ids such as `recap-2026-11-08`, `affirmation-2026-11-08`, `wins-2026-11-08`, and `word-2026-11-08`. The same id updates the existing row, so the routine can run twice.
 
-Victorii (view id `vision`) accepts photo cards from Grokbot. Call `upsert_card` with `kind: "photo"` and an HTTPS `image_url` (jpeg/png/webp/gif, max 5 MB). The server downloads the image into the private `photos` bucket and stores `data.storagePath`. Non-images and oversized files are refused. Prefer `https://`. Phone remote camera/gallery uploads still write the same `storagePath` field. Example:
+### Design tools (Grokbot)
+
+Call `get_view_design` with an optional `viewId` (`today` | `week` | `momente` | `vision` | `home`) before editing a screen. It returns hard constraints and allowed knobs. `get_schema` embeds the same payload under `schema.design`. Stay inside those limits — no free-form HTML. Auth is still `Authorization: Bearer AGENT_TOKEN` on `/mcp` and `POST /api/agent/<tool>`.
+
+Victorii (view id `vision`) is a data-driven 4×3 board (max 12 cards). On `upsert_card` pass layout knobs: `grid` `{col,row,colSpan?,rowSpan?}` (spans max 2), `tilt` (−3…3), `fontScale` (`sm`|`md`|`lg`). Photos always use the polaroid frame. Call `upsert_card` with `kind: "photo"` and an HTTPS `image_url` (jpeg/png/webp/gif, max 5 MB). The server downloads the image into the private `photos` bucket and stores `data.storagePath`. Non-images and oversized files are refused. Prefer `https://`. Phone remote camera/gallery uploads still write the same `storagePath` field. Example:
 
 ```json
 {
@@ -258,14 +262,21 @@ Victorii (view id `vision`) accepts photo cards from Grokbot. Call `upsert_card`
   "kind": "photo",
   "title": "Vacanță",
   "image_url": "https://cdn.example/vacation.jpg",
+  "grid": { "col": 0, "row": 0, "colSpan": 2, "rowSpan": 2 },
+  "tilt": -2,
+  "fontScale": "md",
   "data": { "alt": "Familie la munte" }
 }
 ```
 
 `get_schema` returns the same photo contract under `schema.photos` (MCP `/mcp` and `POST /api/agent/get_schema`).
 
-Momente (view id `momente`) shows countdown spotlights. Call `get_schema` for the full contract, or use `upsert_spotlight` / `delete_spotlight` (also at `POST /api/agent/upsert_spotlight` and `POST /api/agent/delete_spotlight`). Countdown is whole Europe/Bucharest calendar days until `startsAt` (0 = azi). Seeded samples use `spotlight-vacanta-sample` and `spotlight-deadline-sample`; delete those external ids to clear them.
+Momente (view id `momente`) shows countdown spotlights — all active items up to 12, with gallery/packed layouts for 7+. Call `get_schema` / `get_view_design` for the contract, or use `upsert_spotlight` / `delete_spotlight`. Countdown is whole Europe/Bucharest calendar days until `startsAt` (0 = azi). Seeded samples use `spotlight-vacanta-sample` and `spotlight-deadline-sample`; delete those external ids to clear them.
 
 Acasă (view id `home`) is a post-it board of tasks, grocery items, and family messages. Call `get_schema` for `schema.home`, or use `upsert_task` / `delete_task`, `shopping_add` / `shopping_check` / `shopping_delete`, and `upsert_message` / `delete_message`. Message colors are `butter | peach | mint | sky | rose | lemon`. Seeded sample message external id: `msg-welcome`.
+
+### Chromecast / Pi notes (flicker)
+
+View rotation must stay inside the page (`/api/state`). Do not re-cast on every view change. On the Pi (`/etc/tv-agent.toml`), keep `dashcast_force = false` and a high `dashcast_reload_seconds` (default 1800) so DashCast only self-reloads for freeze recovery — each forced `load_url` flashes the DashCast splash. After pulling a new `pi-agent`, restart `tv-agent`. No token values belong in git.
 
 A manual or locked row is left unchanged. A priority needs a one-line reason and expires at the end of the day in Europe/Bucharest unless another time is sent. A manual priority wins. `route_inbox_item` creates an event only when the text has a date and a time. Otherwise it creates a task, or leaves the item as needs review when the destination is unclear. A win or progress card needs `evidence` such as `task:done:<id>`. `undo` restores one of the last 50 assistant writes, and it refuses when a later manual edit is holding that row. `/remote/system` lists those writes and can undo one.

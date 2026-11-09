@@ -82,10 +82,12 @@ describe("momente layout buckets", () => {
     assert.equal(momenteLayoutForCount(4), "tiles");
     assert.equal(momenteLayoutForCount(5), "dense");
     assert.equal(momenteLayoutForCount(6), "dense");
-    assert.equal(momenteLayoutForCount(7), "overflow");
+    assert.equal(momenteLayoutForCount(7), "gallery");
+    assert.equal(momenteLayoutForCount(9), "gallery");
+    assert.equal(momenteLayoutForCount(10), "packed");
   });
 
-  it("keeps pinned and soonest when more than six", () => {
+  it("shows all eight active spotlights without a six-card cap", () => {
     const rows: SnapshotSpotlight[] = Array.from({ length: 8 }, (_, index) => ({
       id: `s${index}`,
       title: `Moment ${index}`,
@@ -95,9 +97,9 @@ describe("momente layout buckets", () => {
       pinned: index === 7,
     }));
     const selected = selectMomenteItems(rows, noon);
-    assert.equal(selected.items.length, 6);
-    assert.equal(selected.hidden, 2);
-    assert.equal(selected.layout, "overflow");
+    assert.equal(selected.items.length, 8);
+    assert.equal(selected.hidden, 0);
+    assert.equal(selected.layout, "gallery");
     assert.ok(selected.items.some((item) => item.id === "s7"));
   });
 });

@@ -155,7 +155,7 @@ export type MonthModel = {
   updatedLabel: string | null;
 };
 
-export type MomenteLayout = "empty" | "solo" | "split" | "tiles" | "dense" | "overflow";
+export type MomenteLayout = "empty" | "solo" | "split" | "tiles" | "dense" | "gallery" | "packed";
 
 export type MomenteItem = {
   id: string;
@@ -180,6 +180,8 @@ export type MomenteModel = {
   emptyLabel: string;
 };
 
+export type VisionFontScale = "sm" | "md" | "lg";
+
 export type VisionCardModel = {
   id: string;
   kind: SnapshotCard["kind"];
@@ -189,6 +191,7 @@ export type VisionCardModel = {
   row: number;
   colSpan: number;
   rowSpan: number;
+  fontScale: VisionFontScale;
   title: string | null;
   body: string | null;
   word: string | null;

@@ -4,6 +4,7 @@ import type { DisplayControl } from "@/lib/remote/hold";
 export const TOOL_NAMES = [
   "get_dashboard_state",
   "get_schema",
+  "get_view_design",
   "upsert_card",
   "delete_card",
   "upsert_spotlight",
