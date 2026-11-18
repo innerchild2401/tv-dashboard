@@ -52,6 +52,7 @@ def run_once(step_input: LoopInput) -> None:
         except Exception:
             # Never leave a dead Default Media Receiver: clear hands-off and restore DashCast.
             memory.hands_off_until = 0.0
+            memory.media_hands_off = False
             restored = False
             if step_input.cast_recover is not None:
                 try:
@@ -72,6 +73,7 @@ def run_once(step_input: LoopInput) -> None:
         else:
             minutes = decided.play_hls_minutes if 1 <= decided.play_hls_minutes <= 180 else 60
             memory.hands_off_until = step_input.now + minutes * 60
+            memory.media_hands_off = True
             note_success(memory)
             remember(memory, "hls cast ok")
     elif decided.cast:

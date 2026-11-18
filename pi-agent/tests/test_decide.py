@@ -234,6 +234,26 @@ class WatchdogTest(unittest.TestCase):
         tick(memory, 30, dmr, [], casts, beats, hls=hls)
         self.assertEqual(casts, [])
 
+    def test_cast_hls_hands_off_clears_when_stream_dies_to_backdrop(self):
+        dash = Sight(looked=True, found=True, app_id=DASH_APP_ID, app_name="DashCast", dash_url=URL)
+        media = Sight(looked=True, found=True, app_id="CC1AD845", app_name="Default Media Receiver")
+        backdrop = Sight(looked=True, found=True, app_id=IDLE_APP_ID, app_name="Backdrop")
+        memory = Memory()
+        casts: list[float] = []
+        hls: list[float] = []
+        beats: list[object] = []
+        tick(memory, 0, dash, [Command("1", "cast_hls", 60)], casts, beats, hls=hls)
+        self.assertEqual(hls, [0])
+        self.assertGreater(memory.hands_off_until, 0)
+        tick(memory, 15, media, [], casts, beats)
+        self.assertEqual(casts, [])
+        self.assertGreater(memory.hands_off_until, 0)
+        # Stream dies → Backdrop under a long hands-off window; clear so idle_seconds can recover.
+        for now in (30, 45, 60, 75, 90):
+            tick(memory, now, backdrop, [], casts, beats)
+        self.assertEqual(memory.hands_off_until, 0)
+        self.assertEqual(casts, [90])
+
     def test_cast_hls_failure_restores_dashcast_without_hands_off(self):
         showing = Sight(looked=True, found=True, app_id=DASH_APP_ID, app_name="DashCast", dash_url=URL)
         recovers = []
