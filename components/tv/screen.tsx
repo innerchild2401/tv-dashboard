@@ -12,7 +12,7 @@ import { LIVE_VIEW_ID, ro } from "@/i18n/ro";
 import type { TvState } from "@/lib/state/types";
 import { tvFitScale } from "@/lib/tv/fit";
 import { NIGHTLY_RELOAD_KEY, nightlyReloadKey, shouldNightlyReload } from "@/lib/tv/reload";
-import { POLL_MS, nextTvState, tvStatePath, withLiveClock } from "@/lib/tv/session";
+import { TV_POLL_MS, nextTvState, tvStatePath, withLiveClock } from "@/lib/tv/session";
 import { CLOCK_MS, delayUntil, onTvWake, scheduleEvery } from "@/lib/tv/timers";
 import { Chrome } from "@/components/tv/chrome";
 
@@ -59,7 +59,11 @@ export function TvScreen({
         if (token) headers.set("Authorization", `Bearer ${token}`);
         // Soft advance: ask /api/state for the successor. Never change window.location
         // for rotation — that churns the Cast URL and (with force=true) relaunches DashCast.
-        const path = opts?.rotate ? tvStatePath(current.nextView) : tvStatePath();
+        // Do not force nextView while an overlay pin (Antena 3) is already showing — the
+        // server also prefers the pin, but skipping ?view= avoids a needless override race.
+        const overlayPinned = current.currentView === LIVE_VIEW_ID && current.hold === "pinned";
+        const path =
+          opts?.rotate && !overlayPinned ? tvStatePath(current.nextView) : tvStatePath();
         const response = await fetch(path, { headers, cache: "no-store" });
         if (!response.ok) {
           if (opts?.rotate) await softFallback(current, headers);
@@ -110,7 +114,7 @@ export function TvScreen({
   }, []);
 
   useEffect(() => {
-    const stop = scheduleEvery(() => refetchRef.current(), POLL_MS);
+    const stop = scheduleEvery(() => refetchRef.current(), TV_POLL_MS);
     return stop;
   }, []);
 
@@ -153,7 +157,7 @@ export function TvScreen({
       window.location.reload();
     };
     check();
-    const stop = scheduleEvery(check, POLL_MS);
+    const stop = scheduleEvery(check, TV_POLL_MS);
     return stop;
   }, []);
 

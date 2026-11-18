@@ -45,6 +45,14 @@ export function personSlug(name: string, taken: string[]): string {
   return id;
 }
 
+const VIEW_ID_RE = /^[a-z][a-z0-9-]{0,39}$/;
+
+/** Rotating / phone-remote view ids — excludes on-demand Antena 3 (use start_antena3_live). */
 export function isViewId(value: string): value is ViewId {
-  return /^[a-z][a-z0-9-]{0,39}$/.test(value) && value !== LIVE_VIEW_ID;
+  return VIEW_ID_RE.test(value) && value !== LIVE_VIEW_ID;
+}
+
+/** display_control.view_id values the TV must honor, including the Antena 3 overlay pin. */
+export function isControlViewId(value: string): value is ViewId {
+  return VIEW_ID_RE.test(value);
 }

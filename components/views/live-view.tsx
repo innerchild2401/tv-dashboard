@@ -16,34 +16,83 @@ export function LiveView({ view }: { view: LiveModel }) {
     if (!video || mode !== "stream") return;
 
     let cancelled = false;
-    const start = async () => {
-      try {
-        video.muted = true;
-        video.playsInline = true;
-        video.src = view.streamUrl;
-        video.load();
-        await video.play();
-        if (cancelled) return;
-        // Unmute after autoplay succeeds when the Cast/Chromium policy allows it.
-        video.muted = false;
-        setStatus(view.label);
-      } catch {
-        if (cancelled) return;
-        setStatus(ro.liveTvFailed);
-        setMode("iframe");
-      }
-    };
-    void start();
+    let hls: { destroy: () => void } | null = null;
 
-    const onError = () => {
+    const failToIframe = () => {
       if (cancelled) return;
       setStatus(ro.liveTvFailed);
       setMode("iframe");
     };
+
+    const markPlaying = () => {
+      if (cancelled) return;
+      // Unmute after autoplay succeeds when the Cast/Chromium policy allows it.
+      try {
+        video.muted = false;
+      } catch {
+        // Keep muted if the receiver rejects unmute.
+      }
+      setStatus(view.label);
+    };
+
+    const startNative = async () => {
+      video.muted = true;
+      video.playsInline = true;
+      video.src = view.streamUrl;
+      video.load();
+      await video.play();
+      markPlaying();
+    };
+
+    const startHls = async () => {
+      const mod = await import("hls.js");
+      const Hls = mod.default;
+      if (cancelled) return;
+      if (!Hls.isSupported()) {
+        failToIframe();
+        return;
+      }
+      const instance = new Hls({
+        enableWorker: false,
+        lowLatencyMode: false,
+        maxBufferLength: 30,
+      });
+      hls = instance;
+      instance.loadSource(view.streamUrl);
+      instance.attachMedia(video);
+      instance.on(Hls.Events.ERROR, (_event, data) => {
+        if (!data?.fatal || cancelled) return;
+        failToIframe();
+      });
+      video.muted = true;
+      video.playsInline = true;
+      await video.play();
+      markPlaying();
+    };
+
+    const start = async () => {
+      try {
+        const canNative =
+          typeof video.canPlayType === "function" &&
+          (video.canPlayType("application/vnd.apple.mpegurl") !== "" ||
+            video.canPlayType("application/x-mpegURL") !== "");
+        if (canNative) {
+          await startNative();
+          return;
+        }
+        await startHls();
+      } catch {
+        failToIframe();
+      }
+    };
+    void start();
+
+    const onError = () => failToIframe();
     video.addEventListener("error", onError);
     return () => {
       cancelled = true;
       video.removeEventListener("error", onError);
+      if (hls) hls.destroy();
       video.pause();
       video.removeAttribute("src");
       video.load();

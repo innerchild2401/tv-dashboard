@@ -20,6 +20,7 @@
     "@modelcontextprotocol/server": "2.4.0",
     "@supabase/realtime-js": "2.119.0",
     "@supabase/supabase-js": "^2.119.0",
+    "hls.js": "^1.7.4",
     "mcp-handler": "2.3.1",
     "next": "16.4.5",
     "node-ical": "0.20.1",

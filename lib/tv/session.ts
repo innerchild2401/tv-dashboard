@@ -2,7 +2,10 @@ import type { TvState } from "@/lib/state/types";
 import { LIVE_VIEW_ID, type ViewId } from "@/i18n/ro";
 import { formatClock, formatDuration } from "@/lib/time/bucharest";
 
+/** Phone remote / nightly checks. */
 export const POLL_MS = 30_000;
+/** TV soft-pin backup when realtime is quiet — keep short so Antena 3 applies in a few seconds. */
+export const TV_POLL_MS = 5_000;
 
 const VIEW_ID_RE = /^[a-z][a-z0-9-]{0,39}$/;
 
