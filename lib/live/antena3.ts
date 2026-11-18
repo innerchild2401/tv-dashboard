@@ -3,8 +3,8 @@
 export const ANTENA3_PAGE_URL = "https://www.antena3.ro/live/";
 
 /**
- * Public free HLS used by the official web player (may rotate).
- * Prefer soft in-page `<video>` playback on Cast; iframe is the fallback.
+ * Public free HLS master (no VAST/IMA wrapper). Official antena3.ro/live embeds
+ * videojs-ima pre-roll — Cast cannot click through ads, so we never iframe that page.
  */
 export const ANTENA3_STREAM_URL = "https://live3vox.antenaplay.ro/a3free/a3free.m3u8";
 

@@ -4,6 +4,8 @@ import { MemoryStore } from "../lib/agent/memory";
 import { executeTool } from "../lib/agent/tools";
 import { viewDesignPayload } from "../lib/agent/design";
 import { LIVE_VIEW_ID } from "../i18n/ro";
+import { ANTENA3_STREAM_URL } from "../lib/live/antena3";
+import { probeHlsUrl } from "../lib/live/playback";
 import { isControlViewId, isViewId } from "../lib/remote/config";
 import { buildTvState } from "../lib/state/build";
 import { sampleSnapshot } from "../lib/state/sample";
@@ -93,5 +95,19 @@ describe("custom pages and antena3 live", () => {
   it("formats celebration without Aniversare azi: Aniversare", () => {
     assert.equal(celebrationDay("Aniversare"), null);
     assert.equal(celebrationDay("Ziua de naștere Zian"), "Aniversare azi: Zian");
+  });
+
+  it("probes the free Antena 3 HLS master without VAST wrappers", async () => {
+    assert.match(ANTENA3_STREAM_URL, /a3free\.m3u8$/);
+    assert.doesNotMatch(ANTENA3_STREAM_URL, /imasdk|vast|token=/i);
+    const probe = await probeHlsUrl(ANTENA3_STREAM_URL, async () => {
+      return new Response("#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1\na.m3u8\n", {
+        status: 200,
+        headers: { "content-type": "application/vnd.apple.mpegurl" },
+      });
+    });
+    // HEAD without body still counts as ok + looksLikeHls via content-type / URL.
+    assert.equal(probe.ok, true);
+    assert.equal(probe.looksLikeHls, true);
   });
 });

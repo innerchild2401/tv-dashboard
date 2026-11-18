@@ -113,7 +113,7 @@ export const LIVE_DESIGN = {
   rules: [
     "MUST NOT be in the default rotation. Start only when Alex asks via MCP.",
     "start_antena3_live pins fullscreen Antena 3 in-page (soft switch — no DashCast relaunch).",
-    "Playback tries the official free HLS first, then falls back to https://www.antena3.ro/live/ iframe.",
+    "Playback uses the free HLS master only (muted autoplay + hls.js on Chromium Cast). No VAST/IMA iframe — ads block Cast.",
     "stop_antena3_live returns to the normal dashboard rotation.",
     "Pi: keep dashcast_force=false; do not load_url for this switch.",
   ],

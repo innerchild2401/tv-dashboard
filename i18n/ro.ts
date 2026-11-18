@@ -101,7 +101,8 @@ export const ro = {
   liveTv: "Antena 3 Live",
   liveTvHint: "Pornit la cerere — nu e în rotație",
   liveTvLoading: "Pornesc Antena 3…",
-  liveTvFailed: "Nu pot porni fluxul. Încerc pagina oficială.",
+  liveTvFailed: "Nu pot porni fluxul.",
+  liveTvStuck: "Fluxul nu a pornit pe TV. Reîncearcă start_antena3_live.",
   customPageEmpty: "Pagina nu are conținut încă",
   remote: {
     notConfigured: "Telefonul nu este configurat.",
