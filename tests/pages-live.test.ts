@@ -65,6 +65,7 @@ describe("custom pages and antena3 live", () => {
     const state = buildTvState(snapshot, now, null, control);
     assert.equal(state.currentView, LIVE_VIEW_ID);
     assert.ok(state.live?.streamUrl);
+    assert.ok(state.buildId);
 
     const stop = await executeTool("stop_antena3_live", {}, { store, now });
     assert.equal(stop.ok, true);

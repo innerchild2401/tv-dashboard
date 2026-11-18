@@ -11,8 +11,19 @@ import { WeekView } from "@/components/views/week-view";
 import { LIVE_VIEW_ID, ro } from "@/i18n/ro";
 import type { TvState } from "@/lib/state/types";
 import { tvFitScale } from "@/lib/tv/fit";
-import { NIGHTLY_RELOAD_KEY, nightlyReloadKey, shouldNightlyReload } from "@/lib/tv/reload";
-import { TV_POLL_MS, nextTvState, tvStatePath, withLiveClock } from "@/lib/tv/session";
+import {
+  NIGHTLY_RELOAD_KEY,
+  nightlyReloadKey,
+  shouldNightlyReload,
+  shouldReloadForBuild,
+} from "@/lib/tv/reload";
+import {
+  TV_POLL_MS,
+  nextTvState,
+  readIncomingBuildId,
+  tvStatePath,
+  withLiveClock,
+} from "@/lib/tv/session";
 import { CLOCK_MS, delayUntil, onTvWake, scheduleEvery } from "@/lib/tv/timers";
 import { Chrome } from "@/components/tv/chrome";
 
@@ -32,14 +43,30 @@ export function TvScreen({
   const rootRef = useRef<HTMLElement | null>(null);
   const stateRef = useRef(state);
   const rotatingRef = useRef(false);
+  const loadedBuildIdRef = useRef(initial.buildId || "");
+  const reloadingRef = useRef(false);
   stateRef.current = state;
 
   useEffect(() => {
+    const maybeReloadForBuild = (body: unknown) => {
+      const incoming = readIncomingBuildId(body);
+      if (!shouldReloadForBuild(loadedBuildIdRef.current, incoming)) return false;
+      if (reloadingRef.current) return true;
+      reloadingRef.current = true;
+      try {
+        window.location.reload();
+      } catch {
+        reloadingRef.current = false;
+      }
+      return true;
+    };
+
     const softFallback = async (current: TvState, headers: Headers) => {
       try {
         const response = await fetch(tvStatePath(), { headers, cache: "no-store" });
         if (!response.ok) return;
         const body: unknown = await response.json();
+        if (maybeReloadForBuild(body)) return;
         const next = nextTvState(current, body);
         if (next.currentView !== current.currentView || next.until !== current.until) {
           setState(next);
@@ -70,6 +97,7 @@ export function TvScreen({
           return;
         }
         const body: unknown = await response.json();
+        if (maybeReloadForBuild(body)) return;
         const next = nextTvState(current, body);
         if (
           opts?.rotate &&
@@ -208,12 +236,13 @@ export function TvScreen({
       data-next-view={shown.nextView}
       data-until={shown.until}
       data-tv-live={live ? "1" : "0"}
+      data-build-id={shown.buildId}
       style={{ "--accent": shown.chrome.accent } as CSSProperties}
     >
       <div className="tv-slot">
         <div className="tv-stage">
           {shown.currentView === LIVE_VIEW_ID && shown.live ? (
-            <LiveView view={shown.live} />
+            <LiveView view={shown.live} buildId={shown.buildId} />
           ) : (
             <Chrome chrome={shown.chrome} dwellLabel={dwellLabel} holdFixed={holdFixed}>
               <ViewBody state={shown} />

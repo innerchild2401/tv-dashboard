@@ -12,6 +12,7 @@ import { CALENDAR_INTERVAL_MS, WEATHER_INTERVAL_MS } from "@/lib/adapters/interv
 import { updatedLabel } from "@/lib/format/display";
 import { formatClock, formatLongDate } from "@/lib/time/bucharest";
 import { projectTodayFromEvents } from "@/lib/today/project";
+import { resolveBuildId } from "@/lib/tv/build-id";
 import type { Snapshot, TodayModel, TvState } from "@/lib/state/types";
 
 export function buildTvState(
@@ -88,6 +89,7 @@ export function buildTvState(
   return {
     ok: true,
     generatedAt: now.toISOString(),
+    buildId: resolveBuildId(),
     currentView: current,
     nextView,
     until,

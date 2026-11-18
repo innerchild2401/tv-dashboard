@@ -299,9 +299,11 @@ Acasă (view id `home`) is a post-it board of tasks, grocery items, and family m
 
 ### Antena 3 live (on demand only)
 
-`start_antena3_live` / `stop_antena3_live` are **not** part of the default rotation. Start only when Alex asks. The TV soft-pins an in-page fullscreen player on the free HLS master (muted autoplay + `hls.js` on Chromium/DashCast). The official `antena3.ro/live` page is **not** iframed — it wraps VAST/IMA pre-roll that Cast cannot click through. Optional `minutes` (default 60, max 180) auto-returns to rotation. `stop_antena3_live` returns immediately.
+`start_antena3_live` / `stop_antena3_live` are **not** part of the default rotation. Start only when Alex asks. The TV soft-pins an in-page fullscreen player on the free HLS master (`hls.js` when MSE exists; native HLS when MSE is missing). Autoplay starts muted for Cast policy, then unmutes for **sound**. No `<video controls>`. An on-screen diagnostic shows `buildId` + player state for photos. The official `antena3.ro/live` page is **not** iframed — it wraps VAST/IMA pre-roll that Cast cannot click through. Optional `minutes` (default 60, max 180) auto-returns to rotation. `stop_antena3_live` returns immediately.
 
-**Pi / DashCast:** keep `dashcast_force = false`. Do **not** call `load_url` for live start/stop — the dashboard switches in-page via `/api/state` + Realtime. After pulling `pi-agent`, restart `tv-agent` only if the watchdog binary changed; live itself needs no Pi change.
+**Cast JS cache:** `/api/state` includes `buildId` (Vercel commit). The TV soft-reloads when that changes — no Pi recast for ordinary deploys. First boot after a long-lived Cast session may still wait for DashCast `reload_seconds` (or a one-shot `tv-agent` restart) until the new client is loaded once.
+
+**Pi / DashCast:** keep `dashcast_force = false`. Do **not** call `load_url` for live start/stop — the dashboard switches in-page via `/api/state` + Realtime. Chromium `--autoplay-policy` on the Pi does **not** apply (DashCast runs on the Chromecast receiver, not Pi Chromium). After pulling `pi-agent`, restart `tv-agent` only if the watchdog binary changed; live itself needs no Pi change for playback.
 
 ### Chromecast / Pi notes (flicker)
 
