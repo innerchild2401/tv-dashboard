@@ -299,7 +299,7 @@ Acasă (view id `home`) is a post-it board of tasks, grocery items, and family m
 
 ### Antena 3 live (on demand only)
 
-`start_antena3_live` / `stop_antena3_live` are **not** part of the default rotation. Start only when Alex asks. The TV soft-pins an in-page fullscreen player (official free HLS first; falls back to an iframe of `https://www.antena3.ro/live/`). Optional `minutes` (default 60, max 180) auto-returns to rotation. `stop_antena3_live` returns immediately.
+`start_antena3_live` / `stop_antena3_live` are **not** part of the default rotation. Start only when Alex asks. The TV soft-pins an in-page fullscreen player on the free HLS master (muted autoplay + `hls.js` on Chromium/DashCast). The official `antena3.ro/live` page is **not** iframed — it wraps VAST/IMA pre-roll that Cast cannot click through. Optional `minutes` (default 60, max 180) auto-returns to rotation. `stop_antena3_live` returns immediately.
 
 **Pi / DashCast:** keep `dashcast_force = false`. Do **not** call `load_url` for live start/stop — the dashboard switches in-page via `/api/state` + Realtime. After pulling `pi-agent`, restart `tv-agent` only if the watchdog binary changed; live itself needs no Pi change.
 

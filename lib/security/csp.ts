@@ -35,8 +35,8 @@ export function contentSecurityPolicy(options: { pathname: string; nonce: string
     "base-uri 'self'",
     "form-action 'self'",
     tv ? `media-src 'self' blob: ${ANTENA_MEDIA}` : "media-src 'self'",
-    // On-demand Antena 3 may fall back to the official live page in an iframe.
-    tv ? `frame-src 'self' ${ANTENA_MEDIA}` : "frame-src 'none'",
+    // Antena 3 plays free HLS in-page (media-src). Keep antena hosts for connect/media only.
+    tv ? `frame-src 'self'` : "frame-src 'none'",
   ];
   // /tv must stay embeddable for DashCast iframe (force=false). Explicit allow-all
   // documents the contract; other routes stay unframeable.
