@@ -359,7 +359,7 @@ export const TOOL_CATALOG: { name: ToolName; title: string; description: string;
     name: "start_antena3_live",
     title: "Start Antena 3 live",
     description:
-      "On-demand only: soft-pin fullscreen Antena 3 CNN live inside the dashboard (free HLS, muted autoplay on Cast — no VAST/IMA page). MUST NOT be in default rotation. Prefer after Alex asks. No DashCast relaunch. Optional minutes (default 60, max 180).",
+      "On-demand only: soft-pin fullscreen Antena 3 CNN live inside the dashboard (free HLS; Cast autoplay then unmute for sound — no VAST/IMA page). MUST NOT be in default rotation. Prefer after Alex asks. No DashCast relaunch. Optional minutes (default 60, max 180).",
     input: liveStartInput,
   },
   {
@@ -690,7 +690,7 @@ function schemaOf(): Outcome {
           viewId: "antena3",
           tools: ["start_antena3_live", "stop_antena3_live"],
           description:
-            "On-demand Antena 3 CNN live fullscreen. Not in default rotation. Soft in-page pin (DashCast force=false). Free HLS only (no VAST/IMA page iframe — ads block Cast).",
+            "On-demand Antena 3 CNN live fullscreen with sound. Not in default rotation. Soft in-page pin (DashCast force=false). Free HLS only (no VAST/IMA page iframe — ads block Cast).",
         },
         home: {
           viewId: "home",
@@ -1619,7 +1619,11 @@ async function startAntena3Live(store: AgentStore, args: unknown, now: Date): Pr
     dimmed: current.dimmed,
   };
   await store.putControl(next);
-  const warnings = ["soft in-page pin — keep dashcast_force=false on the Pi"];
+  const warnings = [
+    "soft in-page pin — keep dashcast_force=false on the Pi",
+    "TV soft-reloads when /api/state buildId changes (Cast JS cache)",
+    "playback unmutes after start for sound — check on-screen diag SUNET",
+  ];
   const probe = await probeHlsUrl(ANTENA3_STREAM_URL);
   if (!probe.ok || !probe.looksLikeHls) {
     warnings.push("HLS master was not reachable from the server — TV may show the stuck fallback");

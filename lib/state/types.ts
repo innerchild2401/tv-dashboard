@@ -245,6 +245,8 @@ export type HomeModel = {
 export type TvState = {
   ok: true;
   generatedAt: string;
+  /** Deploy stamp — TV soft-reloads when this changes (Cast JS cache). */
+  buildId: string;
   currentView: ViewId;
   nextView: ViewId;
   until: string;

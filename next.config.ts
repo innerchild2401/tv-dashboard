@@ -13,6 +13,11 @@ const nextConfig: NextConfig = {
           { key: "X-Content-Type-Options", value: "nosniff" },
         ],
       },
+      {
+        // Cast keeps /tv open for hours — never let intermediaries cache the document.
+        source: "/tv",
+        headers: [{ key: "Cache-Control", value: "no-store" }],
+      },
     ];
   },
 };

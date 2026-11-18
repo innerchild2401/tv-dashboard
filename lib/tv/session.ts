@@ -17,13 +17,21 @@ export function tvStatePath(view?: ViewId | null): string {
 
 export function isTvState(value: unknown): value is TvState {
   if (!value || typeof value !== "object") return false;
-  const record = value as { ok?: unknown; currentView?: unknown; nextView?: unknown; until?: unknown; chrome?: unknown };
+  const record = value as {
+    ok?: unknown;
+    currentView?: unknown;
+    nextView?: unknown;
+    until?: unknown;
+    chrome?: unknown;
+    buildId?: unknown;
+  };
   return (
     record.ok === true &&
     typeof record.currentView === "string" &&
     typeof record.until === "string" &&
     !!record.chrome &&
-    (record.nextView === undefined || typeof record.nextView === "string")
+    (record.nextView === undefined || typeof record.nextView === "string") &&
+    (record.buildId === undefined || typeof record.buildId === "string")
   );
 }
 
@@ -31,8 +39,15 @@ export function nextTvState(current: TvState, incoming: unknown): TvState {
   if (!isTvState(incoming)) return current;
   return {
     ...incoming,
+    buildId: typeof incoming.buildId === "string" && incoming.buildId ? incoming.buildId : current.buildId,
     nextView: parseViewId(incoming.nextView) ?? incoming.currentView,
   };
+}
+
+export function readIncomingBuildId(incoming: unknown): string | null {
+  if (!incoming || typeof incoming !== "object") return null;
+  const buildId = (incoming as { buildId?: unknown }).buildId;
+  return typeof buildId === "string" && buildId.trim() ? buildId.trim() : null;
 }
 
 export function parseViewId(value: string | null | undefined): ViewId | null {

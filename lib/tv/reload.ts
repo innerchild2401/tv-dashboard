@@ -14,3 +14,9 @@ export function shouldNightlyReload(now: Date, alreadyReloadedKey: string | null
   if (!key) return false;
   return alreadyReloadedKey !== key;
 }
+
+/** Soft full reload when Production ships a new deploy (Cast keeps JS forever otherwise). */
+export function shouldReloadForBuild(loadedBuildId: string, incomingBuildId: string | null | undefined): boolean {
+  if (!loadedBuildId || !incomingBuildId) return false;
+  return loadedBuildId !== incomingBuildId;
+}

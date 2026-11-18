@@ -4,9 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import { ro } from "@/i18n/ro";
 import {
   LIVE_PLAY_START_MS,
+  detectCastUa,
+  ensureAudible,
   playWithRetries,
+  preferLiveEngine,
+  prepareVideoElement,
   sleep,
-  tryUnmute,
+  type LiveEngine,
 } from "@/lib/live/playback";
 import type { LiveModel } from "@/lib/state/types";
 
@@ -16,9 +20,13 @@ type LiveProbeApi = {
   currentTime: number;
   paused: boolean;
   muted: boolean;
+  volume: number;
   readyState: number;
   mode: Mode;
   playing: boolean;
+  engine: LiveEngine | "none";
+  ua: string;
+  buildId: string;
 };
 
 declare global {
@@ -27,11 +35,21 @@ declare global {
   }
 }
 
-export function LiveView({ view }: { view: LiveModel }) {
+export function LiveView({ view, buildId }: { view: LiveModel; buildId: string }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const engineRef = useRef<LiveEngine | "none">("none");
   const [mode, setMode] = useState<Mode>("stream");
   const [status, setStatus] = useState<string>(ro.liveTvLoading);
   const [playing, setPlaying] = useState(false);
+  const [engine, setEngine] = useState<LiveEngine | "none">("none");
+  const [muted, setMuted] = useState(true);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [diag, setDiag] = useState({
+    paused: true,
+    readyState: 0,
+    ua: "…",
+    volume: 1,
+  });
 
   useEffect(() => {
     const video = videoRef.current;
@@ -40,17 +58,38 @@ export function LiveView({ view }: { view: LiveModel }) {
     let cancelled = false;
     let hls: { destroy: () => void } | null = null;
     let watchdog: ReturnType<typeof setTimeout> | null = null;
+    let unmuted = false;
+    const uaInfo = detectCastUa();
+    engineRef.current = "none";
+    setEngine("none");
 
     const publish = () => {
       if (typeof window === "undefined") return;
+      setCurrentTime(video.currentTime);
+      setMuted(video.muted);
+      setDiag({
+        paused: video.paused,
+        readyState: video.readyState,
+        ua: uaInfo.label,
+        volume: video.volume,
+      });
       window.__livePlayer = {
         currentTime: video.currentTime,
         paused: video.paused,
         muted: video.muted,
+        volume: video.volume,
         readyState: video.readyState,
         mode,
         playing: !video.paused && video.currentTime > 0.05,
+        engine: engineRef.current,
+        ua: uaInfo.label,
+        buildId,
       };
+    };
+
+    const pickEngine = (next: LiveEngine) => {
+      engineRef.current = next;
+      setEngine(next);
     };
 
     const fail = (message: string) => {
@@ -67,10 +106,19 @@ export function LiveView({ view }: { view: LiveModel }) {
         clearTimeout(watchdog);
         watchdog = null;
       }
-      tryUnmute(video);
       setPlaying(true);
       setStatus(view.label);
       publish();
+      if (!unmuted) {
+        unmuted = true;
+        void ensureAudible(video).then((ok) => {
+          if (!cancelled) {
+            setMuted(video.muted);
+            publish();
+            if (ok) setStatus(`${view.label} · sunet`);
+          }
+        });
+      }
     };
 
     const armWatchdog = (startedAt: number) => {
@@ -98,11 +146,11 @@ export function LiveView({ view }: { view: LiveModel }) {
     };
 
     const startNative = async () => {
-      video.muted = true;
-      video.playsInline = true;
+      pickEngine("native");
+      prepareVideoElement(video, true);
       video.src = view.streamUrl;
       video.load();
-      const started = await playWithRetries(video);
+      const started = await playWithRetries(video, undefined, { preferUnmuted: uaInfo.castLike });
       if (!started) throw new Error("native-play");
       if (!(await waitForProgress())) throw new Error("native-stall");
     };
@@ -116,6 +164,7 @@ export function LiveView({ view }: { view: LiveModel }) {
         return;
       }
 
+      pickEngine("hlsjs");
       const instance = new Hls({
         enableWorker: false,
         lowLatencyMode: false,
@@ -138,9 +187,8 @@ export function LiveView({ view }: { view: LiveModel }) {
       });
 
       if (cancelled) return;
-      video.muted = true;
-      video.playsInline = true;
-      const started = await playWithRetries(video);
+      prepareVideoElement(video, true);
+      const started = await playWithRetries(video, undefined, { preferUnmuted: uaInfo.castLike });
       if (!started) throw new Error("hls-play");
       if (!(await waitForProgress())) throw new Error("hls-stall");
     };
@@ -150,9 +198,11 @@ export function LiveView({ view }: { view: LiveModel }) {
       armWatchdog(begun);
       try {
         // Chromium / DashCast often claims native HLS but never advances currentTime.
-        // Prefer MSE (hls.js) whenever available; native only as last resort.
+        // Prefer MSE (hls.js) whenever available; native only when MSE is missing.
         const mod = await import("hls.js");
-        if (!cancelled && mod.default.isSupported()) {
+        const mseOk = mod.default.isSupported();
+        const pick = preferLiveEngine(mseOk, uaInfo);
+        if (!cancelled && pick === "hlsjs") {
           await startHls();
           return;
         }
@@ -170,6 +220,7 @@ export function LiveView({ view }: { view: LiveModel }) {
     const onError = () => fail(ro.liveTvStuck);
     video.addEventListener("timeupdate", onTime);
     video.addEventListener("playing", onTime);
+    video.addEventListener("volumechange", publish);
     video.addEventListener("error", onError);
     publish();
 
@@ -178,6 +229,7 @@ export function LiveView({ view }: { view: LiveModel }) {
       if (watchdog) clearTimeout(watchdog);
       video.removeEventListener("timeupdate", onTime);
       video.removeEventListener("playing", onTime);
+      video.removeEventListener("volumechange", publish);
       video.removeEventListener("error", onError);
       if (hls) hls.destroy();
       video.pause();
@@ -185,7 +237,7 @@ export function LiveView({ view }: { view: LiveModel }) {
       video.load();
       if (typeof window !== "undefined" && window.__livePlayer) delete window.__livePlayer;
     };
-  }, [mode, view.streamUrl, view.label]);
+  }, [mode, view.streamUrl, view.label, buildId]);
 
   return (
     <section
@@ -194,18 +246,27 @@ export function LiveView({ view }: { view: LiveModel }) {
       data-live-provider={view.provider}
       data-live-playing={playing ? "1" : "0"}
       data-live-mode={mode}
+      data-live-engine={engine}
+      data-live-muted={muted ? "1" : "0"}
+      data-build-id={buildId}
     >
       <header className="live-tv-bar">
         <strong>{view.label}</strong>
         <span>{status}</span>
         <span className="live-tv-hint">{view.hint}</span>
       </header>
+      <p className="live-tv-diag" data-live-diag="" aria-hidden="true">
+        build {buildId.slice(0, 12)} · {engine} · {diag.ua} · t=
+        {currentTime.toFixed(1)}s · {diag.paused ? "paused" : "play"} ·{" "}
+        {muted ? "MUTE" : "SUNET"} · vol={diag.volume.toFixed(1)} · rs={diag.readyState}
+      </p>
       {mode === "stream" ? (
         <video
           ref={videoRef}
           className="live-tv-video"
           playsInline
           autoPlay
+          // Start muted for autoplay policy; ensureAudible unmutes after progress.
           muted
           // No controls: Cast has no pointer; Chrome UI was the stuck 0:00 symptom.
           controls={false}
