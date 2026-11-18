@@ -9,7 +9,7 @@ IDLE_APP_ID = "E8C28D3C"
 DASH_APP_ID = "84912283"
 MEDIA_APP_ID = "CC1AD845"  # Default Media Receiver (cast_hls)
 # Bump when cast-matching / no-flash rules change so /remote/system shows the Pi got the update.
-AGENT_VERSION = "4"
+AGENT_VERSION = "5"
 
 
 @dataclass(frozen=True)
@@ -59,6 +59,8 @@ class Step:
     receiver: str
     cast: bool
     play_hls: bool = False
+    # Hands-off window applied only after play_hls succeeds (see loop).
+    play_hls_minutes: int = 60
     # True for explicit cast_now: quit foreign apps (esp. DMR) and retry DashCast.
     cast_recover: bool = False
     heartbeat: bool = False
@@ -136,6 +138,7 @@ def plan(
     notes: list[str] = []
     forced = False
     play_hls = False
+    play_hls_minutes = 60
     restart = False
     for command in commands:
         if command.kind == "restart_service":
@@ -152,8 +155,9 @@ def plan(
             notes.append("cast_now")
         elif command.kind == "cast_hls":
             play_hls = True
-            minutes = command.minutes if command.minutes and 1 <= command.minutes <= 180 else 60
-            memory.hands_off_until = now + minutes * 60
+            play_hls_minutes = command.minutes if command.minutes and 1 <= command.minutes <= 180 else 60
+            # Do not set hands_off until media actually plays — a failed DMR
+            # launch must not block DashCast recovery for up to 60 minutes.
             _reset_idle(memory)
             notes.append("cast_hls")
 
@@ -201,6 +205,7 @@ def plan(
         receiver=receiver,
         cast=cast,
         play_hls=play_hls and sight.found and not cast,
+        play_hls_minutes=play_hls_minutes,
         cast_recover=forced and sight.found,
         heartbeat=now - memory.last_heartbeat >= settings.heartbeat_seconds,
         restart=restart,
