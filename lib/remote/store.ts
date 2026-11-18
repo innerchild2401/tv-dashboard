@@ -5,7 +5,7 @@ import { cardSchema, configSchema } from "@/lib/schemas";
 import { isPhotoPath, signPhotoMap, verifyStoredPhoto } from "@/lib/photos/access";
 import type { PinGuard } from "@/lib/auth/pin";
 import type { Destination } from "@/lib/remote/capture";
-import { isViewId } from "@/lib/remote/config";
+import { isControlViewId } from "@/lib/remote/config";
 import { ROTATE_CONTROL, type DisplayControl } from "@/lib/remote/hold";
 import { cleanInboxText, type ShoppingWrite, type TaskWrite } from "@/lib/remote/lists";
 import {
@@ -504,7 +504,9 @@ async function dbControl(): Promise<DisplayControl> {
   }
   return {
     mode: data.mode,
-    viewId: data.view_id && isViewId(data.view_id) ? data.view_id : null,
+    // Must accept LIVE_VIEW_ID (antena3). isViewId excludes it for rotation/config only —
+    // rejecting it here dropped soft pins so /api/state never showed Antena 3 on Cast.
+    viewId: data.view_id && isControlViewId(data.view_id) ? data.view_id : null,
     pinnedUntil: data.pinned_until,
     dimmed: data.dimmed,
   };

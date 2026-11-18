@@ -4,9 +4,11 @@ import { MemoryStore } from "../lib/agent/memory";
 import { executeTool } from "../lib/agent/tools";
 import { viewDesignPayload } from "../lib/agent/design";
 import { LIVE_VIEW_ID } from "../i18n/ro";
+import { isControlViewId, isViewId } from "../lib/remote/config";
 import { buildTvState } from "../lib/state/build";
 import { sampleSnapshot } from "../lib/state/sample";
 import { celebrationDay } from "../i18n/ro";
+import type { DisplayControl } from "../lib/remote/hold";
 
 describe("custom pages and antena3 live", () => {
   it("documents page and live design contracts", () => {
@@ -65,6 +67,27 @@ describe("custom pages and antena3 live", () => {
     const stop = await executeTool("stop_antena3_live", {}, { store, now });
     assert.equal(stop.ok, true);
     assert.equal((await store.control()).mode, "rotate");
+  });
+
+  it("lets /api/state read antena3 pins (control view ids include overlay)", () => {
+    assert.equal(isViewId(LIVE_VIEW_ID), false);
+    assert.equal(isControlViewId(LIVE_VIEW_ID), true);
+    assert.equal(isControlViewId("vision"), true);
+    assert.equal(isControlViewId("bad id"), false);
+  });
+
+  it("keeps antena3 pin over Cast soft-rotate ?view= force", () => {
+    const now = new Date("2026-11-18T12:00:00.000Z");
+    const control: DisplayControl = {
+      mode: "pinned",
+      viewId: LIVE_VIEW_ID,
+      pinnedUntil: new Date(now.getTime() + 15 * 60_000).toISOString(),
+      dimmed: false,
+    };
+    const state = buildTvState(sampleSnapshot(now), now, "home", control);
+    assert.equal(state.currentView, LIVE_VIEW_ID);
+    assert.equal(state.hold, "pinned");
+    assert.ok(state.live?.streamUrl);
   });
 
   it("formats celebration without Aniversare azi: Aniversare", () => {

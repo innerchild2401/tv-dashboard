@@ -33,7 +33,11 @@ export function buildTvState(
   });
   const enabled = configured.map((view) => view.id);
   const held = activeHold(control, now, enabled);
+  // Active Antena 3 (overlay) pin must win over Cast soft-rotate `?view=` — otherwise
+  // a dwell timer that still asks for nextView would skip the live pin entirely.
+  const overlayPinned = Boolean(held.viewId && isOverlayView(held.viewId));
   const known =
+    !overlayPinned &&
     forceView &&
     (enabled.includes(forceView) ||
       isOverlayView(forceView) ||
