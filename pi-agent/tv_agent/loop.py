@@ -32,6 +32,7 @@ class LoopInput:
     commands: list[Command]
     sight: Sight
     cast: Callable[[], None]
+    cast_recover: Callable[[], None] | None = None
     play_hls: Callable[[], None] | None = None
     heartbeat: Callable[[dict[str, object]], None] = lambda _payload: None
     wall_iso: str = ""
@@ -55,17 +56,22 @@ def run_once(step_input: LoopInput) -> None:
             note_success(memory)
             remember(memory, "hls cast ok")
     elif decided.cast:
+        recover = decided.cast_recover and step_input.cast_recover is not None
+        action = step_input.cast_recover if recover else step_input.cast
         try:
-            step_input.cast()
+            action()
         except Exception:
             note_failure(memory, step_input.now, settings)
-            remember(memory, "cast failed")
+            remember(memory, "cast recover failed" if recover else "cast failed")
         else:
             memory.last_cast_url = step_input.expected_url
             memory.last_cast_at = step_input.wall_iso
             memory.last_cast_mono = step_input.now
             note_success(memory)
-            remember(memory, "cast ok" if "refresh" not in decided.notes else "cast refresh")
+            if recover:
+                remember(memory, "cast recover ok")
+            else:
+                remember(memory, "cast ok" if "refresh" not in decided.notes else "cast refresh")
     elif sight.looked and sight.found:
         note_success(memory)
         if decided.receiver == "other":

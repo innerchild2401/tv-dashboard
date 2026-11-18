@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import logging
 import threading
+import time
 import uuid
 
 from tv_agent.config import Config
-from tv_agent.decide import Sight
+from tv_agent.decide import DASH_APP_ID, IDLE_APP_ID, Sight
+
+log = logging.getLogger("tv_agent")
 
 
 def observe(config: Config) -> Sight:
@@ -29,19 +33,22 @@ def observe(config: Config) -> Sight:
         _close(cast, browser)
 
 
-def load(config: Config) -> None:
+def load(config: Config, *, relaunch: bool = False) -> None:
     cast, browser = _connect(config)
     try:
         if cast is None:
             raise RuntimeError("chromecast not found")
         cast.wait(timeout=config.discovery_timeout_seconds)
-        _load_url(
-            cast,
-            config.tv_url(),
-            float(config.discovery_timeout_seconds),
-            config.dashcast_force,
-            config.dashcast_reload_seconds,
-        )
+        if relaunch:
+            _relaunch_dashcast(cast, config)
+        else:
+            _load_url(
+                cast,
+                config.tv_url(),
+                float(config.discovery_timeout_seconds),
+                config.dashcast_force,
+                config.dashcast_reload_seconds,
+            )
     finally:
         _close(cast, browser)
 
@@ -51,7 +58,11 @@ ANTENA3_HLS_URL = "https://live3vox.antenaplay.ro/a3free/a3free.m3u8"
 
 
 def play_hls(config: Config, url: str = ANTENA3_HLS_URL) -> None:
-    """Leave DashCast and play HLS on the Default Media Receiver (sound works)."""
+    """Leave DashCast and play HLS on the Default Media Receiver (sound works).
+
+    Prefer soft in-page pin on this Chromecast — cast_hls has left DMR black and
+    blocked DashCast until a Pi reboot. Kept for manual / remote experiments.
+    """
     cast, browser = _connect(config)
     try:
         if cast is None:
@@ -68,6 +79,42 @@ def play_hls(config: Config, url: str = ANTENA3_HLS_URL) -> None:
         cast.media_controller.block_until_active(timeout=float(config.discovery_timeout_seconds))
     finally:
         _close(cast, browser)
+
+
+def _relaunch_dashcast(cast, config: Config) -> None:
+    """Quit foreign apps (esp. Default Media Receiver) and bring DashCast back.
+
+    Retries so stop_antena3_live does not leave a black DMR / zombie DashCast
+    that logs \"already running\" but never shows the panel.
+    """
+    timeout = float(config.discovery_timeout_seconds)
+    url = config.tv_url()
+    last_error: BaseException | None = None
+    for attempt in range(1, 4):
+        try:
+            cast.wait(timeout=timeout)
+            app_id = (getattr(cast, "app_id", None) or "").upper()
+            if app_id and app_id not in ("", IDLE_APP_ID):
+                log.info("cast_now recover: quitting app %s (attempt %s)", app_id, attempt)
+                try:
+                    cast.quit_app()
+                except Exception as exc:  # noqa: BLE001 — keep retrying
+                    log.warning("quit_app failed: %s", exc)
+                time.sleep(2.0)
+                cast.wait(timeout=timeout)
+            _load_url(cast, url, timeout, False, config.dashcast_reload_seconds)
+            cast.wait(timeout=timeout)
+            active = (getattr(cast, "app_id", None) or "").upper()
+            if active == DASH_APP_ID:
+                log.info("cast_now recover: DashCast active (attempt %s)", attempt)
+                return
+            last_error = RuntimeError(f"dashcast not active after load (app={active or 'none'})")
+            log.warning("%s", last_error)
+        except Exception as exc:  # noqa: BLE001 — retry
+            last_error = exc
+            log.warning("cast_now recover attempt %s failed: %s", attempt, exc)
+        time.sleep(1.5)
+    raise last_error or RuntimeError("dashcast relaunch failed")
 
 
 def _connect(config: Config):

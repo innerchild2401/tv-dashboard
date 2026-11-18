@@ -1621,7 +1621,7 @@ async function startAntena3Live(store: AgentStore, args: unknown, now: Date): Pr
   };
   await store.putControl(next);
   const warnings = [
-    "soft in-page pin + Pi cast_hls (Default Media Receiver) when tv-agent ≥3",
+    "soft in-page pin only (cast_hls disabled — Default Media Receiver crashed DashCast on this Chromecast)",
     "keep dashcast_force=false on the Pi",
     "TV soft-reloads when /api/state buildId changes (Cast JS cache)",
     "if stream stalls ~12s the TV abandons the pin and returns to rotation",
@@ -1630,9 +1630,8 @@ async function startAntena3Live(store: AgentStore, args: unknown, now: Date): Pr
   if (!probe.ok || !probe.looksLikeHls) {
     warnings.push("HLS master was not reachable from the server — TV may show the stuck fallback");
   }
-  const queued = await queueCommand("cast_hls", minutes, now);
-  if (!queued.ok) warnings.push("Pi cast_hls was not queued — in-page player only until tv-agent updated");
-  else warnings.push("queued cast_hls for Pi Default Media Receiver (sound)");
+  // Do not queue cast_hls: switching to Default Media Receiver (CC1AD845) left this
+  // Chromecast on a black/broken receiver and made DashCast recovery unreliable.
   return done(success(LIVE_VIEW_ID, warnings), {
     control: current,
     expectControl: next,
@@ -1650,7 +1649,7 @@ async function stopAntena3Live(store: AgentStore, now: Date): Promise<Outcome> {
   const warnings: string[] = [];
   const queued = await queueCommand("cast_now", null, now);
   if (!queued.ok) warnings.push("Pi cast_now was not queued — DashCast may still show media until recast");
-  else warnings.push("queued cast_now to restore DashCast dashboard");
+  else warnings.push("queued cast_now to restore DashCast (Pi quits media app + retries)");
   return done(success("rotate", warnings), { control: current, expectControl: next });
 }
 

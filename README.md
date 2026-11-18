@@ -303,7 +303,7 @@ Acasă (view id `home`) is a post-it board of tasks, grocery items, and family m
 
 **Cast JS cache:** `/api/state` includes `buildId` (Vercel commit). The TV soft-reloads when that changes — no Pi recast for ordinary deploys. First boot after a long-lived Cast session may still wait for DashCast `reload_seconds` (or a one-shot `tv-agent` restart) until the new client is loaded once.
 
-**Pi / DashCast / HLS:** keep `dashcast_force = false`. `start_antena3_live` also queues Pi `cast_hls` (Default Media Receiver plays the free HLS master **with sound**). `stop_antena3_live` queues `cast_now` to restore DashCast. Requires `tv-agent` **version ≥ 3** on the Pi (`scp` `pi-agent`, then `sudo systemctl restart tv-agent`). Heartbeat `version` on `/remote/system` should show `3`. In-page playback remains as a fallback; the TV abandons a stuck pin after ~12s.
+**Pi / DashCast / HLS:** keep `dashcast_force = false`. `start_antena3_live` uses **soft in-page pin only** — it does **not** queue `cast_hls` (Default Media Receiver crashed DashCast on this Chromecast and left a black screen until Pi reboot). `stop_antena3_live` queues `cast_now`; tv-agent **v4+** quits any foreign app (incl. DMR) and retries DashCast until app `84912283` is active. Heartbeat `version` on `/remote/system` should show `4`. The TV abandons a stuck pin after ~12s.
 
 ### Chromecast / Pi notes (flicker)
 

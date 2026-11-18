@@ -69,6 +69,9 @@ def cycle(config: Config, memory: Memory, started: float) -> None:
     def do_cast() -> None:
         load(config)
 
+    def do_cast_recover() -> None:
+        load(config, relaunch=True)
+
     def do_play_hls() -> None:
         play_hls(config)
 
@@ -84,6 +87,7 @@ def cycle(config: Config, memory: Memory, started: float) -> None:
             commands=commands,
             sight=sight,
             cast=do_cast,
+            cast_recover=do_cast_recover,
             play_hls=do_play_hls,
             heartbeat=do_heartbeat,
             wall_iso=datetime.now(timezone.utc).isoformat(),
