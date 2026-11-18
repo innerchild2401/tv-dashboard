@@ -218,6 +218,11 @@ class WatchdogTest(unittest.TestCase):
         self.assertTrue(should_look(memory, now, []))
         self.assertTrue(should_look(memory, 0, [Command("1", "cast_now")]))
         self.assertTrue(should_look(memory, 0, [Command("2", "cast_hls", 15)]))
+        pinned = Memory()
+        pinned.media_hands_off = True
+        pinned.hands_off_until = 999
+        self.assertFalse(should_look(pinned, 30, []))
+        self.assertTrue(should_look(pinned, 30, [Command("9", "cast_now")]))
 
     def test_cast_hls_plays_media_and_hands_off(self):
         showing = Sight(looked=True, found=True, app_id=DASH_APP_ID, app_name="DashCast", dash_url=URL)

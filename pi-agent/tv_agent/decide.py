@@ -9,7 +9,7 @@ IDLE_APP_ID = "E8C28D3C"
 DASH_APP_ID = "84912283"
 MEDIA_APP_ID = "CC1AD845"  # Default Media Receiver (cast_hls)
 # Bump when cast-matching / no-flash rules change so /remote/system shows the Pi got the update.
-AGENT_VERSION = "7"
+AGENT_VERSION = "8"
 
 
 @dataclass(frozen=True)
@@ -113,8 +113,12 @@ def classify(sight: Sight, expected_url: str, last_cast_url: str | None) -> str:
 
 
 def should_look(memory: Memory, now: float, commands: list[Command]) -> bool:
-    if any(command.kind in {"cast_now", "cast_hls"} for command in commands):
+    if any(command.kind in {"cast_now", "cast_hls", "restart_service"} for command in commands):
         return True
+    # HH-35: do not rediscover/reconnect while Antena3 pin is active — extra Cast
+    # sockets after play_hls were killing DMR (~1 min) without a DashCast steal.
+    if memory.media_hands_off and now < memory.hands_off_until:
+        return False
     return now >= memory.backoff_until
 
 

@@ -12,6 +12,17 @@ from tv_agent.decide import DASH_APP_ID, IDLE_APP_ID, Sight
 
 log = logging.getLogger("tv_agent")
 
+# Keep the Cast sender socket alive for the whole Antena3 pin. Disconnecting after
+# play_media (v5–v7) let Family-room Chromecast drop HLS within ~1 minute while
+# the Pi pin still looked "hands off" (HH-35 21:47 — no DashCast steal in journal).
+_media_lock = threading.Lock()
+_media_stop = threading.Event()
+_media_thread: threading.Thread | None = None
+_media_cast = None
+_media_browser = None
+_MEDIA_HOLD_MAX_SECONDS = 3 * 60 * 60
+_MEDIA_LOG_EVERY_SECONDS = 10.0
+
 
 def observe(config: Config) -> Sight:
     cast, browser = _connect(config)
@@ -34,6 +45,7 @@ def observe(config: Config) -> Sight:
 
 
 def load(config: Config, *, relaunch: bool = False) -> None:
+    stop_media_session()
     cast, browser = _connect(config)
     try:
         if cast is None:
@@ -60,22 +72,46 @@ ANTENA3_HLS_URL = "https://live3vox.antenaplay.ro/a3free/a3free.m3u8"
 _ACTIVE_MEDIA_STATES = frozenset({"PLAYING", "BUFFERING"})
 
 
+def stop_media_session() -> None:
+    """End the background Antena3 sender hold (stop / pin expiry / new cast)."""
+    global _media_thread, _media_cast, _media_browser
+    with _media_lock:
+        _media_stop.set()
+        thread = _media_thread
+        cast = _media_cast
+        browser = _media_browser
+        _media_thread = None
+        _media_cast = None
+        _media_browser = None
+    if thread is not None and thread.is_alive():
+        thread.join(timeout=8.0)
+    # Thread closes its own sockets in finally; this is a safety net.
+    if cast is not None or browser is not None:
+        _close(cast, browser)
+
+
 def play_hls(config: Config, url: str = ANTENA3_HLS_URL) -> None:
-    """Cast Antena 3 HLS as native media with volume, then verify playback.
+    """Cast Antena 3 HLS as native media with volume, then hold the sender session.
 
     Chosen path (HH-32): hardened ``pychromecast`` ``MediaController`` on the
     Default Media Receiver. Alternatives considered and skipped:
 
     - ``catt``: same DMR underneath, extra Pi dependency.
     - Custom Cast receiver: needs a Cast developer app + hosted receiver.
-    - Fragile fire-and-forget DMR (HH-30/31): left this TV black / unrecovered.
+    - Fragile fire-and-forget DMR (HH-30/31/35): left this TV black / unrecovered
+      once the Pi disconnected the Cast socket.
 
     Safety contract: if media does not reach PLAYING/BUFFERING with content
     within the discovery timeout, raise — the watchdog loop must quit the media
     app and restore DashCast so Cast is never left dead. Soft in-page pin on the
     dashboard remains the secondary fallback when this path fails or is skipped.
+
+    HH-35: keep the Cast connection open until ``stop_media_session`` (stop /
+    pin expiry). Journal peeks on this same socket prove sustained PLAYING.
     """
+    stop_media_session()
     cast, browser = _connect(config)
+    transferred = False
     try:
         if cast is None:
             raise RuntimeError("chromecast not found")
@@ -94,8 +130,11 @@ def play_hls(config: Config, url: str = ANTENA3_HLS_URL) -> None:
         if not _wait_media_active(cast, timeout):
             raise RuntimeError("hls media not playing")
         log.info("cast_hls: media active on %s", getattr(cast, "app_id", None) or "?")
+        _start_media_holder(cast, browser)
+        transferred = True
     finally:
-        _close(cast, browser)
+        if not transferred:
+            _close(cast, browser)
 
 
 def _ensure_audible_volume(cast) -> None:
@@ -132,25 +171,54 @@ def _wait_media_active(cast, timeout: float) -> bool:
     return False
 
 
-def log_media_status(config: Config) -> str | None:
-    """Peek Default Media Receiver state for journal proof of sustained PLAYING."""
-    cast, browser = _connect(config)
+def _start_media_holder(cast, browser) -> None:
+    global _media_thread, _media_cast, _media_browser
+    with _media_lock:
+        _media_stop.clear()
+        _media_cast = cast
+        _media_browser = browser
+        _media_thread = threading.Thread(
+            target=_media_holder_loop,
+            args=(cast, browser),
+            name="cast-hls-hold",
+            daemon=True,
+        )
+        _media_thread.start()
+
+
+def _media_holder_loop(cast, browser) -> None:
+    """Keep the sender linked and log MediaController until stop/expiry."""
+    started = time.monotonic()
+    deadline = started + _MEDIA_HOLD_MAX_SECONDS
     try:
-        if cast is None:
-            return None
-        cast.wait(timeout=float(config.discovery_timeout_seconds))
-        app_id = (getattr(cast, "app_id", None) or "").upper()
-        if app_id != "CC1AD845":
-            log.info("cast_hls: media peek app=%s (not DMR)", app_id or "none")
-            return app_id or None
-        status = cast.media_controller.status
-        state = (getattr(status, "player_state", None) or "").upper() or "UNKNOWN"
-        current = getattr(status, "current_time", None)
-        content = getattr(status, "content_id", None) or getattr(status, "content_type", None)
-        log.info("cast_hls: MediaController %s t=%s content=%s", state, current, bool(content))
-        return state
+        while not _media_stop.is_set() and time.monotonic() < deadline:
+            held = int(time.monotonic() - started)
+            try:
+                status = cast.media_controller.status
+                state = (getattr(status, "player_state", None) or "").upper() or "UNKNOWN"
+                current = getattr(status, "current_time", None)
+                content = getattr(status, "content_id", None) or getattr(status, "content_type", None)
+                app_id = (getattr(cast, "app_id", None) or "").upper()
+                log.info(
+                    "cast_hls: MediaController %s t=%s held=%ss app=%s content=%s",
+                    state,
+                    current,
+                    held,
+                    app_id or "?",
+                    bool(content),
+                )
+            except Exception as exc:  # noqa: BLE001 — keep holding; log and retry
+                log.warning("cast_hls: hold peek failed: %s", exc)
+            if _media_stop.wait(_MEDIA_LOG_EVERY_SECONDS):
+                break
+        log.info("cast_hls: media hold ending after %ss", int(time.monotonic() - started))
     finally:
         _close(cast, browser)
+        with _media_lock:
+            if _media_cast is cast:
+                _media_cast = None
+                _media_browser = None
+                _media_thread = None
 
 
 def _relaunch_dashcast(cast, config: Config) -> None:
