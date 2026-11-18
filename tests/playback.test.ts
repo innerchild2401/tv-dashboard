@@ -1,11 +1,14 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  HLS_IMPORT_TIMEOUT_MS,
   LIVE_PLAY_RETRY_MS,
   LIVE_PLAY_START_MS,
   detectCastUa,
+  detectLiveCapabilities,
   preferLiveEngine,
   probeHlsUrl,
+  streamHost,
   tryUnmute,
 } from "../lib/live/playback";
 
@@ -45,6 +48,7 @@ describe("live playback helpers", () => {
     assert.equal(cr.crKey, true);
     assert.equal(cr.castLike, true);
     assert.equal(cr.label, "CrKey");
+    assert.ok(cr.shortUa.includes("CrKey"));
     assert.equal(preferLiveEngine(true, cr), "hlsjs");
     assert.equal(preferLiveEngine(false, cr), "native");
 
@@ -53,6 +57,11 @@ describe("live playback helpers", () => {
     );
     assert.equal(desk.castLike, false);
     assert.equal(preferLiveEngine(false, desk), "native");
+    assert.equal(streamHost("https://live3vox.antenaplay.ro/a3free/a3free.m3u8"), "live3vox.antenaplay.ro");
+    assert.ok(HLS_IMPORT_TIMEOUT_MS <= 5_000);
+    const caps = detectLiveCapabilities({ canPlayType: () => "" });
+    assert.equal(typeof caps.mse, "boolean");
+    assert.equal(caps.nativeHls, false);
   });
 
   it("remutes when unmute pauses the element", () => {

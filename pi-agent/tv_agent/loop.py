@@ -32,10 +32,11 @@ class LoopInput:
     commands: list[Command]
     sight: Sight
     cast: Callable[[], None]
-    heartbeat: Callable[[dict[str, object]], None]
-    wall_iso: str
-    uptime_seconds: int
-    local_ip: str | None
+    play_hls: Callable[[], None] | None = None
+    heartbeat: Callable[[dict[str, object]], None] = lambda _payload: None
+    wall_iso: str = ""
+    uptime_seconds: int = 0
+    local_ip: str | None = None
     version: str = AGENT_VERSION
 
 
@@ -44,7 +45,16 @@ def run_once(step_input: LoopInput) -> None:
     settings = step_input.settings
     sight = step_input.sight
     decided = plan(memory, sight, step_input.commands, settings, step_input.now, step_input.expected_url)
-    if decided.cast:
+    if decided.play_hls and step_input.play_hls is not None:
+        try:
+            step_input.play_hls()
+        except Exception:
+            note_failure(memory, step_input.now, settings)
+            remember(memory, "hls cast failed")
+        else:
+            note_success(memory)
+            remember(memory, "hls cast ok")
+    elif decided.cast:
         try:
             step_input.cast()
         except Exception:
