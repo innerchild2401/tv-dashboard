@@ -9,7 +9,7 @@ IDLE_APP_ID = "E8C28D3C"
 DASH_APP_ID = "84912283"
 MEDIA_APP_ID = "CC1AD845"  # Default Media Receiver (cast_hls)
 # Bump when cast-matching / no-flash rules change so /remote/system shows the Pi got the update.
-AGENT_VERSION = "6"
+AGENT_VERSION = "8"
 
 
 @dataclass(frozen=True)
@@ -113,8 +113,12 @@ def classify(sight: Sight, expected_url: str, last_cast_url: str | None) -> str:
 
 
 def should_look(memory: Memory, now: float, commands: list[Command]) -> bool:
-    if any(command.kind in {"cast_now", "cast_hls"} for command in commands):
+    if any(command.kind in {"cast_now", "cast_hls", "restart_service"} for command in commands):
         return True
+    # HH-35: do not rediscover/reconnect while Antena3 pin is active — extra Cast
+    # sockets after play_hls were killing DMR (~1 min) without a DashCast steal.
+    if memory.media_hands_off and now < memory.hands_off_until:
+        return False
     return now >= memory.backoff_until
 
 
@@ -186,17 +190,20 @@ def plan(
             _reset_idle(memory)
 
     receiver = memory.receiver
-    # cast_hls hands-off must not trap a dead Backdrop/idle screen when the
-    # media stream dies after PLAYING (HH-32 E2E: CC1AD845 → E8C28D3C).
-    # Only clear media hands-off — explicit release must still block auto-cast.
-    if (
-        memory.media_hands_off
-        and now < memory.hands_off_until
-        and receiver in {"idle", "backdrop"}
-    ):
-        memory.hands_off_until = 0.0
+    # HH-35: Antena3 / cast_hls holds until explicit cast_now (stop) or pin expiry.
+    # Do NOT clear media hands-off on Backdrop/idle blips — that let the idle
+    # watchdog steal Cast ~60–90s mid-play (v6 hands_off_clear_idle).
+    media_pin_expired = False
+    if memory.media_hands_off and now >= memory.hands_off_until:
         memory.media_hands_off = False
-        notes.append("hands_off_clear_idle")
+        media_pin_expired = True
+        notes.append("media_pin_expired")
+
+    # Pin expiry restores the panel when Cast is still on DMR or a blank screen.
+    if media_pin_expired and sight.found and receiver in {"other", "idle", "backdrop"}:
+        forced = True
+        play_hls = False
+        notes.append("media_pin_recover")
 
     auto = False
     # Hard rule: never load_url for view rotation / keepalive while DashCast is already

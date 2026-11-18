@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 
 from tv_agent.cast_client import load, observe, play_hls
 from tv_agent.config import Config, read_config
-from tv_agent.decide import AGENT_VERSION, Command, Memory, Sight, should_look
+from tv_agent.decide import AGENT_VERSION, MEDIA_APP_ID, Command, Memory, Sight, should_look
 from tv_agent.http_client import request_json, scrub
 from tv_agent.loop import LoopInput, RestartRequested, run_once
 
@@ -63,6 +63,14 @@ def cycle(config: Config, memory: Memory, started: float) -> None:
         except Exception:
             sight = Sight(looked=True, found=False)
             log.error("discovery failed")
+    elif memory.media_hands_off and now < memory.hands_off_until:
+        # Trust the held cast_hls session — do not open a competing Cast socket.
+        sight = Sight(
+            looked=True,
+            found=True,
+            app_id=MEDIA_APP_ID,
+            app_name="Default Media Receiver",
+        )
     else:
         sight = Sight(looked=False, found=False)
 
