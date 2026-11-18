@@ -9,7 +9,7 @@ IDLE_APP_ID = "E8C28D3C"
 DASH_APP_ID = "84912283"
 MEDIA_APP_ID = "CC1AD845"  # Default Media Receiver (cast_hls)
 # Bump when cast-matching / no-flash rules change so /remote/system shows the Pi got the update.
-AGENT_VERSION = "5"
+AGENT_VERSION = "6"
 
 
 @dataclass(frozen=True)
@@ -45,6 +45,8 @@ class Memory:
     backoff_step: int = 0
     last_heartbeat: float = -1_000_000_000.0
     hands_off_until: float = 0.0
+    # True only while hands_off protects a successful cast_hls session.
+    media_hands_off: bool = False
     last_cast_url: str | None = None
     last_cast_at: str | None = None
     last_cast_mono: float = -1_000_000_000.0
@@ -147,11 +149,13 @@ def plan(
         elif command.kind == "release":
             minutes = command.minutes if command.minutes and 1 <= command.minutes <= 240 else 30
             memory.hands_off_until = now + minutes * 60
+            memory.media_hands_off = False
             _reset_idle(memory)
             notes.append("release")
         elif command.kind == "cast_now":
             forced = True
             memory.hands_off_until = 0.0
+            memory.media_hands_off = False
             notes.append("cast_now")
         elif command.kind == "cast_hls":
             play_hls = True
@@ -182,6 +186,18 @@ def plan(
             _reset_idle(memory)
 
     receiver = memory.receiver
+    # cast_hls hands-off must not trap a dead Backdrop/idle screen when the
+    # media stream dies after PLAYING (HH-32 E2E: CC1AD845 → E8C28D3C).
+    # Only clear media hands-off — explicit release must still block auto-cast.
+    if (
+        memory.media_hands_off
+        and now < memory.hands_off_until
+        and receiver in {"idle", "backdrop"}
+    ):
+        memory.hands_off_until = 0.0
+        memory.media_hands_off = False
+        notes.append("hands_off_clear_idle")
+
     auto = False
     # Hard rule: never load_url for view rotation / keepalive while DashCast is already
     # showing this dashboard. Recast only cold start (idle/backdrop), wrong URL, or
