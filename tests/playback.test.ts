@@ -32,25 +32,25 @@ describe("live playback helpers", () => {
   });
 
   it("remutes when unmute pauses the element", () => {
+    const state = { paused: false, muted: true, currentTime: 1.5 };
     const video = {
-      paused: false,
-      currentTime: 1.5,
-      muted: true,
+      get paused() {
+        return state.paused;
+      },
+      get currentTime() {
+        return state.currentTime;
+      },
+      get muted() {
+        return state.muted;
+      },
+      set muted(value: boolean) {
+        state.muted = value;
+        if (!value) state.paused = true;
+      },
       play: async () => {
-        video.paused = false;
+        state.paused = false;
       },
     } as unknown as HTMLVideoElement;
-
-    Object.defineProperty(video, "muted", {
-      configurable: true,
-      get() {
-        return (this as { _muted?: boolean })._muted ?? true;
-      },
-      set(value: boolean) {
-        (this as { _muted?: boolean })._muted = value;
-        if (!value) (this as { paused: boolean }).paused = true;
-      },
-    });
 
     assert.equal(tryUnmute(video), false);
     assert.equal(video.muted, true);
