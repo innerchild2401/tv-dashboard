@@ -32,6 +32,8 @@ describe("vision layout constraints", () => {
     assert.ok(all.views?.week);
     assert.ok(all.views?.today);
     assert.ok(all.views?.home);
+    assert.ok(all.pages);
+    assert.ok(all.live);
     const vision = viewDesignPayload("vision");
     assert.equal(vision.view?.viewId, "vision");
     assert.equal(vision.view?.maxCards, 12);

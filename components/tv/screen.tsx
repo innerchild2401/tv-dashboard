@@ -2,11 +2,13 @@
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { HomeView } from "@/components/views/home-view";
+import { LiveView } from "@/components/views/live-view";
 import { MomenteView } from "@/components/views/momente-view";
+import { PageView } from "@/components/views/page-view";
 import { TodayView } from "@/components/views/today-view";
 import { VisionView } from "@/components/views/vision-view";
 import { WeekView } from "@/components/views/week-view";
-import { ro } from "@/i18n/ro";
+import { LIVE_VIEW_ID, ro } from "@/i18n/ro";
 import type { TvState } from "@/lib/state/types";
 import { tvFitScale } from "@/lib/tv/fit";
 import { NIGHTLY_RELOAD_KEY, nightlyReloadKey, shouldNightlyReload } from "@/lib/tv/reload";
@@ -206,9 +208,13 @@ export function TvScreen({
     >
       <div className="tv-slot">
         <div className="tv-stage">
-          <Chrome chrome={shown.chrome} dwellLabel={dwellLabel} holdFixed={holdFixed}>
-            <ViewBody state={shown} />
-          </Chrome>
+          {shown.currentView === LIVE_VIEW_ID && shown.live ? (
+            <LiveView view={shown.live} />
+          ) : (
+            <Chrome chrome={shown.chrome} dwellLabel={dwellLabel} holdFixed={holdFixed}>
+              <ViewBody state={shown} />
+            </Chrome>
+          )}
         </div>
       </div>
     </main>
@@ -222,5 +228,6 @@ function ViewBody({ state }: { state: TvState }) {
   if (state.currentView === "momente" && state.momente) return <MomenteView view={state.momente} />;
   if (state.currentView === "vision" && state.vision) return <VisionView view={state.vision} />;
   if (state.currentView === "home" && state.home) return <HomeView view={state.home} />;
+  if (state.page) return <PageView view={state.page} />;
   return null;
 }

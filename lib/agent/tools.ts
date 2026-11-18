@@ -43,9 +43,11 @@ import { plainText } from "@/lib/remote/text";
 import { publishChange } from "@/lib/remote/publish";
 import { cardSchema, paletteTokenSchema } from "@/lib/schemas";
 import { endOfZonedDay, zonedParts, zonedTimeToUtc } from "@/lib/time/bucharest";
-import type { DisplayControl } from "@/lib/remote/hold";
+import { LIVE_VIEW_ID, RESERVED_VIEW_IDS } from "@/i18n/ro";
+import { ROTATE_CONTROL, type DisplayControl } from "@/lib/remote/hold";
 
 const READS = new Set<ToolName>(["get_dashboard_state", "get_schema", "get_view_design", "get_inbox"]);
+const DWELL_DEFAULT = 120;
 const KIND_COLOR: Record<CardKind, Palette> = {
   photo: "coral",
   affirmation: "pink",
@@ -60,9 +62,45 @@ const KIND_COLOR: Record<CardKind, Palette> = {
 const emptyInput = z.object({});
 const designInput = z.object({
   viewId: z
-    .enum(["today", "week", "momente", "vision", "home"])
+    .enum(["today", "week", "momente", "vision", "home", "custom-page", "pages", "antena3", "live"])
     .optional()
-    .describe("Optional view id. Omit to receive constraints for every rotating view."),
+    .describe("Optional view id. Omit for every rotating view plus custom pages and Antena 3 live."),
+});
+const pageInput = z.object({
+  id: z
+    .string()
+    .trim()
+    .min(1)
+    .max(40)
+    .regex(/^[a-z][a-z0-9-]*$/, "page id must be lowercase letters, numbers, dashes")
+    .describe("Stable page slug, e.g. reguli-familie. Not a core view id."),
+  title: z.string().trim().min(1).max(80).describe("Romanian title shown full-screen on Cast."),
+  body: z.string().max(2000).optional().describe("Romanian body text. No HTML."),
+  enabled: z
+    .boolean()
+    .optional()
+    .describe("When true, include in the TV rotation. Default true for new pages, keep existing when omitted."),
+  order: z.number().int().min(1).max(40).optional(),
+  dwellSeconds: z.number().int().min(30).max(600).optional(),
+  weight: z.number().positive().max(20).optional(),
+});
+const pageDeleteInput = z.object({
+  id: z
+    .string()
+    .trim()
+    .min(1)
+    .max(40)
+    .regex(/^[a-z][a-z0-9-]*$/)
+    .describe("Page slug to remove from config and rotation."),
+});
+const liveStartInput = z.object({
+  minutes: z
+    .number()
+    .int()
+    .min(1)
+    .max(180)
+    .optional()
+    .describe("How long to keep Antena 3 before auto-return. Default 60. Soft in-page pin — no DashCast relaunch."),
 });
 const cardInput = z.object({
   externalId: z.string().trim().min(1).max(200).describe("Stable idempotency key. The same value updates the existing card."),
@@ -234,7 +272,7 @@ export const TOOL_CATALOG: { name: ToolName; title: string; description: string;
     name: "get_view_design",
     title: "Per-view design constraints",
     description:
-      "Call this before editing a TV view. Returns hard constraints and allowed design knobs for today|week|momente|vision|home (or all views). Stay inside the limits — no free-form HTML. Auth remains Bearer AGENT_TOKEN on /mcp.",
+      "Call this before editing a TV view. Returns hard constraints and allowed design knobs for today|week|momente|vision|home|custom-page|antena3 (or all). Stay inside the limits — no free-form HTML. Auth remains Bearer AGENT_TOKEN on /mcp.",
     input: designInput,
   },
   {
@@ -258,6 +296,32 @@ export const TOOL_CATALOG: { name: ToolName; title: string; description: string;
     description:
       "Soft-delete an assistant-owned Momente spotlight. Pass id (uuid) or externalId. Example: {\"externalId\":\"trip-ski-2027\"}. Locked/manual rows are refused.",
     input: deleteInput,
+  },
+  {
+    name: "upsert_page",
+    title: "Upsert custom page",
+    description:
+      "Create or update a full-screen custom TV page and optionally enable it in rotation. Params: id (slug), title, body?, enabled?, order?, dwellSeconds?, weight?. Reserved ids today|week|momente|vision|home|antena3 refused. Example: {\"id\":\"reguli-familie\",\"title\":\"Reguli\",\"body\":\"Fără telefon la masă\",\"enabled\":true}.",
+    input: pageInput,
+  },
+  {
+    name: "delete_page",
+    title: "Delete custom page",
+    description: "Remove a custom page from config and from the Cast rotation. Pass id (slug).",
+    input: pageDeleteInput,
+  },
+  {
+    name: "start_antena3_live",
+    title: "Start Antena 3 live",
+    description:
+      "On-demand only: soft-pin fullscreen Antena 3 CNN live inside the dashboard (HLS first, official page iframe fallback). MUST NOT be in default rotation. Prefer after Alex asks. No DashCast relaunch. Optional minutes (default 60, max 180).",
+    input: liveStartInput,
+  },
+  {
+    name: "stop_antena3_live",
+    title: "Stop Antena 3 live",
+    description: "Leave Antena 3 live and return to the normal dashboard rotation (soft in-page).",
+    input: emptyInput,
   },
   { name: "set_recap", title: "Daily recap", description: "Replace the assistant's daily recap text and recap card. Use a stable externalId such as recap-2026-11-08.", input: recapInput },
   { name: "set_priority", title: "Priority", description: "Set the one priority for today. A reason is required. A manual priority always wins.", input: priorityInput },
@@ -378,6 +442,10 @@ async function dispatch(store: AgentStore, name: ToolName, args: unknown, now: D
   if (name === "delete_card") return deleteCard(store, args, now);
   if (name === "upsert_spotlight") return upsertSpotlight(store, args);
   if (name === "delete_spotlight") return deleteSpotlight(store, args, now);
+  if (name === "upsert_page") return upsertPage(store, args);
+  if (name === "delete_page") return deletePage(store, args);
+  if (name === "start_antena3_live") return startAntena3Live(store, args, now);
+  if (name === "stop_antena3_live") return stopAntena3Live(store, now);
   if (name === "set_recap") return setRecap(store, args, now);
   if (name === "set_priority") return setPriority(store, args, now);
   if (name === "get_inbox") return listInbox(store, args);
@@ -396,20 +464,23 @@ async function dispatch(store: AgentStore, name: ToolName, args: unknown, now: D
 }
 
 async function stateOf(store: AgentStore, now: Date): Promise<Outcome> {
-  const [views, people, cards, events, tasks, shopping, recaps, priorities, inbox, metrics, spotlights, messages] = await Promise.all([
-    store.views(),
-    store.people(),
-    store.cards(),
-    store.events(),
-    store.tasks(),
-    store.shopping(),
-    store.recaps(),
-    store.priorities(),
-    store.inbox(),
-    store.metrics(),
-    store.spotlights(),
-    store.messages(),
-  ]);
+  const [views, people, pages, cards, events, tasks, shopping, recaps, priorities, inbox, metrics, spotlights, messages, control] =
+    await Promise.all([
+      store.views(),
+      store.people(),
+      store.pages(),
+      store.cards(),
+      store.events(),
+      store.tasks(),
+      store.shopping(),
+      store.recaps(),
+      store.priorities(),
+      store.inbox(),
+      store.metrics(),
+      store.spotlights(),
+      store.messages(),
+      store.control(),
+    ]);
   const parts = zonedParts(now);
   const start = zonedTimeToUtc({ ...parts, hour: 0, minute: 0 }).getTime();
   const end = endOfZonedDay(parts).getTime();
@@ -419,6 +490,7 @@ async function stateOf(store: AgentStore, now: Date): Promise<Outcome> {
     result: success(null, [], {
       state: {
         views,
+        pages,
         people,
         cards: active(cards).map(publicCard),
         spotlights: active(spotlights).map(publicSpotlight),
@@ -436,6 +508,11 @@ async function stateOf(store: AgentStore, now: Date): Promise<Outcome> {
           source: metric.source,
           fetchedAt: metric.fetchedAt,
         })),
+        live: {
+          active: control.mode === "pinned" && control.viewId === "antena3",
+          viewId: "antena3",
+          pinnedUntil: control.pinnedUntil,
+        },
       },
     }),
   };
@@ -536,6 +613,24 @@ function schemaOf(): Outcome {
           ],
         },
         design: viewDesignPayload(),
+        pages: {
+          tools: ["upsert_page", "delete_page"],
+          description:
+            "Full-screen custom Cast pages (title + body, Romanian). Add to rotation with enabled:true. Never use reserved ids today|week|momente|vision|home|antena3.",
+          example: {
+            id: "reguli-familie",
+            title: "Reguli",
+            body: "Fără telefon la masă",
+            enabled: true,
+            dwellSeconds: 120,
+          },
+        },
+        live: {
+          viewId: "antena3",
+          tools: ["start_antena3_live", "stop_antena3_live"],
+          description:
+            "On-demand Antena 3 CNN live fullscreen. Not in default rotation. Soft in-page pin (DashCast force=false). HLS first, official https://www.antena3.ro/live/ iframe fallback.",
+        },
         home: {
           viewId: "home",
           labelRo: "Acasă",
@@ -610,6 +705,7 @@ function schemaOf(): Outcome {
           "Victorii photo cards: kind=photo + image_url (HTTPS). Server stores into the private photos bucket. Pass grid/tilt/fontScale for layout.",
           "Acasă post-its: tasks via upsert_task/delete_task, groceries via shopping_add/shopping_check/shopping_delete, messages via upsert_message/delete_message.",
           "Call get_view_design (or get_schema.design) before editing a view. Stay inside constraints — no free-form HTML.",
+          "Custom pages: upsert_page / delete_page. Antena 3 live: start_antena3_live / stop_antena3_live only when Alex asks — never default rotation.",
         ],
       },
     }),
@@ -1168,6 +1264,91 @@ async function setMetric(store: AgentStore, args: unknown, now: Date): Promise<O
   return done(success(id), existing ? { metrics: [copy(existing)] } : { drop: { metrics: [id] } });
 }
 
+async function upsertPage(store: AgentStore, args: unknown): Promise<Outcome> {
+  const input = read(pageInput, args);
+  if (!input.ok) return input.outcome;
+  const id = input.value.id;
+  if (RESERVED_VIEW_IDS.has(id)) return no("that id is reserved for a built-in screen");
+  const [pages, views] = await Promise.all([store.pages(), store.views()]);
+  const previous = { views: copy(views), pages: copy(pages) };
+  const existing = pages.find((page) => page.id === id) ?? null;
+  const nextPages = existing
+    ? pages.map((page) =>
+        page.id === id
+          ? {
+              id,
+              title: input.value.title,
+              body: input.value.body ?? page.body,
+            }
+          : page,
+      )
+    : [...pages, { id, title: input.value.title, body: input.value.body ?? "" }];
+  const prior = views.find((view) => view.id === id);
+  const enabled = input.value.enabled ?? prior?.enabled ?? true;
+  const without = views.filter((view) => view.id !== id);
+  const maxOrder = without.reduce((max, view) => Math.max(max, view.order), 0);
+  const nextViews = [
+    ...without,
+    {
+      id,
+      enabled,
+      order: input.value.order ?? prior?.order ?? maxOrder + 1,
+      dwellSeconds: input.value.dwellSeconds ?? prior?.dwellSeconds ?? DWELL_DEFAULT,
+      weight: input.value.weight ?? prior?.weight ?? 1,
+    },
+  ].sort((left, right) => left.order - right.order);
+  if (!nextViews.some((view) => view.enabled)) return no("leave at least one screen enabled");
+  await store.putPagesAndViews({ pages: nextPages, views: nextViews });
+  return done(success(id), { config: previous });
+}
+
+async function deletePage(store: AgentStore, args: unknown): Promise<Outcome> {
+  const input = read(pageDeleteInput, args);
+  if (!input.ok) return input.outcome;
+  const id = input.value.id;
+  if (RESERVED_VIEW_IDS.has(id)) return no("that id is reserved for a built-in screen");
+  const [pages, views] = await Promise.all([store.pages(), store.views()]);
+  if (!pages.some((page) => page.id === id) && !views.some((view) => view.id === id)) {
+    return no("that page was not found");
+  }
+  const previous = { views: copy(views), pages: copy(pages) };
+  const nextPages = pages.filter((page) => page.id !== id);
+  const nextViews = views.filter((view) => view.id !== id);
+  if (!nextViews.some((view) => view.enabled)) return no("leave at least one screen enabled");
+  await store.putPagesAndViews({ pages: nextPages, views: nextViews });
+  return done(success(id), { config: previous });
+}
+
+async function startAntena3Live(store: AgentStore, args: unknown, now: Date): Promise<Outcome> {
+  const input = read(liveStartInput, args);
+  if (!input.ok) return input.outcome;
+  const current = await store.control();
+  if (holding(current, now) && current.viewId !== LIVE_VIEW_ID) return no("the phone is holding the screen");
+  const minutes = input.value.minutes ?? 60;
+  const next: DisplayControl = {
+    mode: "pinned",
+    viewId: LIVE_VIEW_ID,
+    pinnedUntil: new Date(now.getTime() + minutes * 60_000).toISOString(),
+    dimmed: current.dimmed,
+  };
+  await store.putControl(next);
+  return done(success(LIVE_VIEW_ID, ["soft in-page pin — keep dashcast_force=false on the Pi"]), {
+    control: current,
+    expectControl: next,
+  });
+}
+
+async function stopAntena3Live(store: AgentStore, now: Date): Promise<Outcome> {
+  const current = await store.control();
+  if (holding(current, now) && current.viewId !== LIVE_VIEW_ID) return no("the phone is holding the screen");
+  if (current.viewId !== LIVE_VIEW_ID && current.mode === "rotate") {
+    return done(success(null, ["Antena 3 was not active"]), null);
+  }
+  const next: DisplayControl = { ...ROTATE_CONTROL, dimmed: current.dimmed };
+  await store.putControl(next);
+  return done(success("rotate"), { control: current, expectControl: next });
+}
+
 async function pinView(store: AgentStore, args: unknown, now: Date): Promise<Outcome> {
   const input = read(pinInput, args);
   if (!input.ok) return input.outcome;
@@ -1182,6 +1363,7 @@ async function pinView(store: AgentStore, args: unknown, now: Date): Promise<Out
     if (!card) return no("that card was not found");
     viewId = card.viewId;
   } else if (input.value.cardId) warnings.push("viewId was used");
+  if (viewId === LIVE_VIEW_ID) return no("use start_antena3_live / stop_antena3_live for Antena 3");
   if (!views.some((view) => view.id === viewId)) return no("that view does not exist");
   const minutes = input.value.minutes ?? 10;
   const next: DisplayControl = {
@@ -1637,6 +1819,7 @@ function mergeUndo(left: UndoBody, right: UndoBody): UndoBody {
     drop: Object.values(drop).some((ids) => ids && ids.length > 0) ? drop : undefined,
     control: right.control ?? left.control,
     expectControl: right.expectControl ?? left.expectControl,
+    config: right.config ?? left.config,
   };
 }
 

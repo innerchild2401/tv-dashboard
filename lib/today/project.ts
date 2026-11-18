@@ -1,4 +1,4 @@
-import { ro, type ViewId } from "@/i18n/ro";
+import { isCoreViewId, ro, type ViewId } from "@/i18n/ro";
 import { personChip, type PersonChip } from "@/lib/people";
 import { sampleSchedule } from "@/lib/today/schedule";
 import { compareEvents, eventOnDay } from "@/lib/views/overlap";
@@ -153,7 +153,7 @@ export function projectTodayFromEvents(input: {
     }),
     views: input.viewIds.map((id) => ({
       id,
-      label: ro.views[id],
+      label: isCoreViewId(id) ? ro.views[id] : id,
       active: id === input.activeView,
       dwellLabel: id === input.activeView ? `${input.dwellSeconds}s` : "",
     })),

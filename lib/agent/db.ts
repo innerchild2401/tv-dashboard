@@ -126,6 +126,7 @@ export class SupabaseStore implements AgentStore {
     await this.drop("spotlights", body.drop?.spotlights, now);
     await this.drop("messages", body.drop?.messages, now);
     if (body.control) await this.putControl(body.control);
+    if (body.config) await this.putPagesAndViews(body.config);
   }
 
   async views(): Promise<ViewRow[]> {
@@ -136,6 +137,25 @@ export class SupabaseStore implements AgentStore {
   async people(): Promise<PersonRow[]> {
     const config = await this.config();
     return config.people.map((person) => ({ id: person.id, name: person.name }));
+  }
+
+  async pages(): Promise<{ id: string; title: string; body: string }[]> {
+    const config = await this.config();
+    return config.pages.map((page) => ({ ...page }));
+  }
+
+  async putPagesAndViews(input: {
+    pages: { id: string; title: string; body: string }[];
+    views: ViewRow[];
+  }): Promise<void> {
+    const { error } = await this.db
+      .from("config")
+      .update({
+        pages: input.pages as unknown as Json,
+        views: input.views as unknown as Json,
+      })
+      .eq("id", 1);
+    if (error) throw new Error("db");
   }
 
   async cards(): Promise<CardRecord[]> {
@@ -405,13 +425,15 @@ export class SupabaseStore implements AgentStore {
   }
 
   private async config() {
-    const { data, error } = await this.db.from("config").select("views, people").eq("id", 1).maybeSingle();
+    const { data, error } = await this.db.from("config").select("views, people, pages").eq("id", 1).maybeSingle();
     if (error || !data) return sampleConfig;
     const views = configSchema.shape.views.safeParse(data.views);
     const people = configSchema.shape.people.safeParse(data.people);
+    const pages = configSchema.shape.pages.safeParse((data as { pages?: unknown }).pages ?? []);
     return {
       views: views.success ? views.data : sampleConfig.views,
       people: people.success ? people.data : sampleConfig.people,
+      pages: pages.success ? pages.data : [],
     };
   }
 

@@ -1,4 +1,4 @@
-import { ro, VIEW_IDS, type ViewId } from "@/i18n/ro";
+import { LIVE_VIEW_ID, RESERVED_VIEW_IDS, VIEW_IDS, isCoreViewId, ro, type ViewId } from "@/i18n/ro";
 import { configSchema } from "@/lib/schemas";
 import type { DashboardConfig } from "@/lib/state/types";
 
@@ -6,8 +6,17 @@ export function parseConfig(input: unknown): { ok: true; config: DashboardConfig
   const parsed = configSchema.safeParse(input);
   if (!parsed.success) return { ok: false, reason: ro.remote.invalid };
   const ids = parsed.data.views.map((view) => view.id);
-  if (ids.length !== VIEW_IDS.length || VIEW_IDS.some((id) => !ids.includes(id))) {
-    return { ok: false, reason: ro.remote.invalid };
+  if (new Set(ids).size !== ids.length) return { ok: false, reason: ro.remote.invalid };
+  if (VIEW_IDS.some((id) => !ids.includes(id))) return { ok: false, reason: ro.remote.invalid };
+  if (ids.includes(LIVE_VIEW_ID)) return { ok: false, reason: ro.remote.invalid };
+  const pageIds = new Set(parsed.data.pages.map((page) => page.id));
+  if (pageIds.size !== parsed.data.pages.length) return { ok: false, reason: ro.remote.invalid };
+  for (const page of parsed.data.pages) {
+    if (RESERVED_VIEW_IDS.has(page.id)) return { ok: false, reason: ro.remote.invalid };
+  }
+  for (const view of parsed.data.views) {
+    if (isCoreViewId(view.id)) continue;
+    if (!pageIds.has(view.id)) return { ok: false, reason: ro.remote.invalid };
   }
   if (!parsed.data.views.some((view) => view.enabled)) return { ok: false, reason: ro.remote.needView };
   const people = new Set<string>();
@@ -37,5 +46,5 @@ export function personSlug(name: string, taken: string[]): string {
 }
 
 export function isViewId(value: string): value is ViewId {
-  return VIEW_IDS.includes(value as ViewId);
+  return /^[a-z][a-z0-9-]{0,39}$/.test(value) && value !== LIVE_VIEW_ID;
 }

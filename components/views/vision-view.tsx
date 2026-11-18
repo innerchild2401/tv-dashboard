@@ -7,7 +7,7 @@ export function VisionView({ view }: { view: VisionModel }) {
       {view.cards.map((card) => (
         <article
           key={card.id}
-          className={`vision-card ${card.color} ${card.kind} font-${card.fontScale}${card.photoUrl ? " has-photo" : ""}`}
+          className={`vision-card ${card.color} ${card.kind} font-${card.fontScale}${card.photoUrl ? " has-photo" : ""}${spanClass(card)}`}
           style={{
             gridColumn: `${card.col + 1} / span ${card.colSpan}`,
             gridRow: `${card.row + 1} / span ${card.rowSpan}`,
@@ -19,6 +19,12 @@ export function VisionView({ view }: { view: VisionModel }) {
       ))}
     </section>
   );
+}
+
+function spanClass(card: VisionCardModel): string {
+  if (card.colSpan >= 2 && card.rowSpan >= 2) return " span-lg";
+  if (card.colSpan >= 2 || card.rowSpan >= 2) return " span-md";
+  return " span-sm";
 }
 
 function CardBody({ card }: { card: VisionCardModel }) {
@@ -34,63 +40,83 @@ function CardBody({ card }: { card: VisionCardModel }) {
       </div>
     );
   }
+
   if (card.kind === "affirmation") {
-    return <p className="script">{card.body}</p>;
+    return (
+      <div className="card-fill">
+        <p className="card-kicker">{card.title ?? ro.views.vision}</p>
+        <p className="script card-body">{card.body}</p>
+      </div>
+    );
   }
+
   if (card.kind === "word") {
     return (
-      <>
+      <div className="card-fill">
         <p className="card-kicker">{card.title ?? ro.wordOfMonth}</p>
-        <h2>{card.word}</h2>
-      </>
+        <h2 className="card-hero">{card.word}</h2>
+        {card.body && card.body !== card.word ? <p className="card-body">{card.body}</p> : null}
+      </div>
     );
   }
+
   if (card.kind === "countdown" && card.countdownValue) {
     return (
-      <>
+      <div className="card-fill">
         <p className="card-kicker">
           <span aria-hidden="true">✦ </span>
-          {card.title}
+          {card.title ?? ro.views.momente}
         </p>
-        <h2 className="hero-num">{card.countdownValue}</h2>
-        <p>{card.countdownUnit}</p>
-      </>
+        <h2 className="hero-num card-hero">{card.countdownValue}</h2>
+        <p className="card-unit">{card.countdownUnit}</p>
+        {card.body ? <p className="card-body">{card.body}</p> : null}
+      </div>
     );
   }
+
   if (card.kind === "progress" && card.progress) {
     return (
-      <>
-        <p className="card-kicker">{card.progress.label}</p>
+      <div className="card-fill">
+        <p className="card-kicker">{card.title ?? card.progress.label}</p>
         {card.progress.style === "bar" ? <Bar value={card.progress.value} max={card.progress.max} /> : <Ring value={card.progress.value} max={card.progress.max} />}
-        <strong>{card.progress.text}</strong>
-      </>
+        <strong className="card-hero">{card.progress.text}</strong>
+        {card.body ? <p className="card-body">{card.body}</p> : null}
+      </div>
     );
   }
+
   if (card.kind === "wins") {
     return (
-      <>
+      <div className="card-fill">
         <p className="card-kicker">{ro.wins}</p>
-        <ul>
-          {card.wins.map((item) => (
-            <li key={item}>{item}</li>
-          ))}
-        </ul>
-      </>
+        {card.title ? <h2 className="card-hero wins-title">{card.title}</h2> : null}
+        {card.wins.length > 0 ? (
+          <ul className="card-body">
+            {card.wins.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        ) : card.body ? (
+          <p className="card-body">{card.body}</p>
+        ) : null}
+      </div>
     );
   }
+
   if (card.kind === "recap") {
     return (
-      <>
-        <p className="card-kicker">{ro.views.today}</p>
-        <p className="recap-text">{card.body}</p>
-      </>
+      <div className="card-fill">
+        <p className="card-kicker">{card.title ?? ro.views.today}</p>
+        <p className="recap-text card-body">{card.body}</p>
+      </div>
     );
   }
+
   return (
-    <>
-      {card.title ? <p className="card-kicker">{card.title}</p> : <p className="card-kicker">{ro.photo}</p>}
-      {card.body ? <p>{card.body}</p> : null}
-    </>
+    <div className="card-fill">
+      <p className="card-kicker">{card.title ?? ro.photo}</p>
+      {card.body ? <p className="card-body">{card.body}</p> : null}
+    </div>
   );
 }
 

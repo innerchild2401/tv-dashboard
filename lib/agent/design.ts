@@ -28,8 +28,9 @@ export const VISION_DESIGN = {
     "Layout is data-driven: pass grid {col,row,colSpan,rowSpan}, tilt, and fontScale on upsert_card.",
     "Grid is 4×3. col 0–3, row 0–2. col+colSpan≤4, row+rowSpan≤3. Spans max 2.",
     "Max 12 live cards. Overlap is warned; prefer empty cells.",
+    "Every kind should show title + body on TV (wins: hero title e.g. Bravo, Zian!; affirmation: scripture ref as title; countdown: include body).",
     "Photos always render in the polaroid frame — no custom HTML/CSS.",
-    "fontScale is sm|md|lg only. Romanian copy preferred.",
+    "fontScale is sm|md|lg only. Romanian copy preferred. Soft pastel palette on Cast.",
   ],
 };
 
@@ -83,6 +84,35 @@ export const HOME_DESIGN = {
   ],
 };
 
+export const PAGE_DESIGN = {
+  viewId: "custom-page" as const,
+  labelRo: "Pagină nouă",
+  tools: ["upsert_page", "delete_page"] as const,
+  knobs: ["id", "title", "body", "enabled", "order", "dwellSeconds", "weight"] as const,
+  canvas: TV_DESIGN.canvas,
+  rules: [
+    "Create full-screen Romanian pages via upsert_page (id slug, title, body).",
+    "Pass enabled:true to put the page into the Cast rotation; enabled:false keeps content but skips rotation.",
+    "id must be lowercase a-z / digits / dashes, not a reserved core id (today|week|momente|vision|home|antena3).",
+    "delete_page removes the page and drops it from rotation.",
+    "No free-form HTML/CSS — title + body only, 1280×720 Cast canvas.",
+  ],
+};
+
+export const LIVE_DESIGN = {
+  viewId: "antena3" as const,
+  labelRo: "Antena 3 Live",
+  tools: ["start_antena3_live", "stop_antena3_live"] as const,
+  knobs: ["minutes"] as const,
+  rules: [
+    "MUST NOT be in the default rotation. Start only when Alex asks via MCP.",
+    "start_antena3_live pins fullscreen Antena 3 in-page (soft switch — no DashCast relaunch).",
+    "Playback tries the official free HLS first, then falls back to https://www.antena3.ro/live/ iframe.",
+    "stop_antena3_live returns to the normal dashboard rotation.",
+    "Pi: keep dashcast_force=false; do not load_url for this switch.",
+  ],
+};
+
 export const VIEW_DESIGNS = {
   today: TODAY_DESIGN,
   week: WEEK_DESIGN,
@@ -103,7 +133,14 @@ export function viewDesignPayload(viewId?: string | null) {
     "Stay inside the listed constraints — no free-form HTML or CSS.",
     "Auth: Authorization Bearer AGENT_TOKEN on /mcp and POST /api/agent/<tool>.",
     "Romanian UI copy where user-facing.",
+    "Custom pages: upsert_page / delete_page. Antena 3: start_antena3_live / stop_antena3_live (never default rotation).",
   ];
+  if (viewId === "antena3" || viewId === "live") {
+    return { canvas: TV_DESIGN.canvas, instructions, view: LIVE_DESIGN };
+  }
+  if (viewId === "custom-page" || viewId === "page" || viewId === "pages") {
+    return { canvas: TV_DESIGN.canvas, instructions, view: PAGE_DESIGN };
+  }
   if (viewId && isDesignViewId(viewId)) {
     return {
       canvas: TV_DESIGN.canvas,
@@ -115,6 +152,8 @@ export function viewDesignPayload(viewId?: string | null) {
     canvas: TV_DESIGN.canvas,
     instructions,
     views: VIEW_DESIGNS,
+    pages: PAGE_DESIGN,
+    live: LIVE_DESIGN,
   };
 }
 

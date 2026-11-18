@@ -1,4 +1,4 @@
-import type { ViewId } from "@/i18n/ro";
+import { LIVE_VIEW_ID, type ViewId } from "@/i18n/ro";
 
 export type HoldMode = "rotate" | "paused" | "pinned" | "locked";
 
@@ -23,12 +23,20 @@ export type ControlAction =
 
 type ViewRow = { id: ViewId; enabled: boolean; order: number; dwellSeconds: number };
 
+/** On-demand live is pin-only and must not require enabled rotation membership. */
+export function isOverlayView(id: string | null | undefined): boolean {
+  return id === LIVE_VIEW_ID;
+}
+
 export function activeHold(
   control: DisplayControl,
   now: Date,
   enabled: ViewId[],
 ): { mode: HoldMode; viewId: ViewId | null } {
-  if (control.mode === "rotate" || !control.viewId || !enabled.includes(control.viewId)) {
+  if (control.mode === "rotate" || !control.viewId) {
+    return { mode: "rotate", viewId: null };
+  }
+  if (!isOverlayView(control.viewId) && !enabled.includes(control.viewId)) {
     return { mode: "rotate", viewId: null };
   }
   if (control.mode === "pinned") {

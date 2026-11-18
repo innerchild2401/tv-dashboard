@@ -103,6 +103,7 @@ async function loadDatabaseSnapshot(now: Date): Promise<Snapshot> {
     theme: configResult.data?.theme,
     people: configResult.data?.people,
     views: configResult.data?.views,
+    pages: (configResult.data as { pages?: unknown } | null)?.pages ?? [],
     profiles: configResult.data?.profiles,
     quietHours: configResult.data?.quiet_hours,
     location: configResult.data?.location,

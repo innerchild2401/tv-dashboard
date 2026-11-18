@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ro, VIEW_IDS, type ViewId } from "@/i18n/ro";
+import { ro, VIEW_IDS, viewLabel, type ViewId } from "@/i18n/ro";
 import { personSlug } from "@/lib/remote/config";
 import { ACCENT_CHOICES, accentColor } from "@/lib/theme/accent";
 import type { DashboardConfig } from "@/lib/state/types";
@@ -48,7 +48,7 @@ export function Editor() {
       <h1>{ro.viewsNav}</h1>
       {views.map((view, index) => (
         <article key={view.id} className="card-row">
-          <strong>{ro.views[view.id as ViewId] ?? view.id}</strong>
+          <strong>{viewLabel(view.id, config.pages)}</strong>
           <label className="check">
             <input
               type="checkbox"
@@ -283,7 +283,7 @@ export function Editor() {
           </div>
           {profile.views.map((view) => (
             <div key={view.id} className="pair">
-              <span>{VIEW_IDS.includes(view.id as ViewId) ? ro.views[view.id as ViewId] : view.id}</span>
+              <span>{viewLabel(view.id, config.pages)}</span>
               <label>
                 {ro.weight}
                 <input

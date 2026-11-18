@@ -13,7 +13,7 @@ export function Controls() {
   return (
     <section className="stack">
       <p className="kicker">{ro.remote.now}</p>
-      <h1>{ro.views[board.viewId]}</h1>
+      <h1>{ro.views[board.viewId as keyof typeof ro.views] ?? board.viewId}</h1>
       <p>
         {ro.remote.why}: {board.reason}
       </p>

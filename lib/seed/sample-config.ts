@@ -25,6 +25,7 @@ export const sampleConfig = {
     equal("vision" as ViewId, 4),
     equal("home" as ViewId, 5),
   ],
+  pages: [] as { id: string; title: string; body: string }[],
   profiles: [
     {
       id: "morning",

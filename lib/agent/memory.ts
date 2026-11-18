@@ -24,6 +24,8 @@ import {
   type ViewRow,
 } from "@/lib/agent/model";
 
+type PageRow = { id: string; title: string; body: string };
+
 type Bag = {
   audits: AuditRow[];
   auditResults: Map<string, ToolResult>;
@@ -39,6 +41,8 @@ type Bag = {
   spotlights: SpotlightRecord[];
   messages: MessageRecord[];
   control: DisplayControl;
+  views: ViewRow[];
+  pages: PageRow[];
 };
 
 export class MemoryStore implements AgentStore {
@@ -57,6 +61,8 @@ export class MemoryStore implements AgentStore {
     spotlights: [],
     messages: [],
     control: { ...ROTATE_CONTROL },
+    views: sampleConfig.views.map((view) => ({ ...view })),
+    pages: [],
   };
 
   async countRecent(now: Date): Promise<number> {
@@ -132,14 +138,27 @@ export class MemoryStore implements AgentStore {
     this.drop(this.bag.spotlights, body.drop?.spotlights, now);
     this.drop(this.bag.messages, body.drop?.messages, now);
     if (body.control) this.bag.control = copy(body.control);
+    if (body.config) {
+      this.bag.views = copy(body.config.views);
+      this.bag.pages = copy(body.config.pages);
+    }
   }
 
   async views(): Promise<ViewRow[]> {
-    return sampleConfig.views.map((view) => ({ ...view }));
+    return copy(this.bag.views);
   }
 
   async people(): Promise<PersonRow[]> {
     return sampleConfig.people.map((person) => ({ id: person.id, name: person.name }));
+  }
+
+  async pages(): Promise<PageRow[]> {
+    return copy(this.bag.pages);
+  }
+
+  async putPagesAndViews(input: { pages: PageRow[]; views: ViewRow[] }): Promise<void> {
+    this.bag.pages = copy(input.pages);
+    this.bag.views = copy(input.views);
   }
 
   async cards(): Promise<CardRecord[]> {

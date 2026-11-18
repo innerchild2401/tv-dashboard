@@ -152,12 +152,12 @@ fieldset {
   border-radius: 50%;
 }
 
-.swatch.sand { background: #ffd166; }
-.swatch.coral { background: #ff8a7a; }
-.swatch.lilac { background: #c4b5fd; }
-.swatch.mint { background: #6ee7b7; }
-.swatch.sky { background: #7dd3fc; }
-.swatch.pink { background: #f9a8d4; }
+.swatch.sand { background: #f3e4c4; }
+.swatch.coral { background: #f0c8c0; }
+.swatch.lilac { background: #ddd4f0; }
+.swatch.mint { background: #c8e6d8; }
+.swatch.sky { background: #c6dff0; }
+.swatch.pink { background: #efd0e0; }
 
 .lock-banner,
 .remote-error,
@@ -221,12 +221,12 @@ fieldset {
   font-size: 13px;
 }
 
-.mini-card.sand { background: #ffd166; }
-.mini-card.coral { background: #ff8a7a; }
-.mini-card.lilac { background: #c4b5fd; }
-.mini-card.mint { background: #6ee7b7; }
-.mini-card.sky { background: #7dd3fc; }
-.mini-card.pink { background: #f9a8d4; }
+.mini-card.sand { background: #f3e4c4; }
+.mini-card.coral { background: #f0c8c0; }
+.mini-card.lilac { background: #ddd4f0; }
+.mini-card.mint { background: #c8e6d8; }
+.mini-card.sky { background: #c6dff0; }
+.mini-card.pink { background: #efd0e0; }
 .mini-card.selected { outline: 3px solid var(--text); }
 
 .plain-list {

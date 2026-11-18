@@ -9,6 +9,10 @@ export const TOOL_NAMES = [
   "delete_card",
   "upsert_spotlight",
   "delete_spotlight",
+  "upsert_page",
+  "delete_page",
+  "start_antena3_live",
+  "stop_antena3_live",
   "set_recap",
   "set_priority",
   "get_inbox",
@@ -208,6 +212,10 @@ export type UndoBody = {
   >;
   control?: DisplayControl;
   expectControl?: DisplayControl;
+  config?: {
+    views: ViewRow[];
+    pages: { id: string; title: string; body: string }[];
+  };
 };
 
 export type AuditRow = {
@@ -240,6 +248,11 @@ export interface AgentStore {
   applyUndo(body: UndoBody, now: Date): Promise<void>;
   views(): Promise<ViewRow[]>;
   people(): Promise<PersonRow[]>;
+  pages(): Promise<{ id: string; title: string; body: string }[]>;
+  putPagesAndViews(input: {
+    pages: { id: string; title: string; body: string }[];
+    views: ViewRow[];
+  }): Promise<void>;
   cards(): Promise<CardRecord[]>;
   putCard(card: CardRecord): Promise<void>;
   events(): Promise<EventRecord[]>;

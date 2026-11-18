@@ -1,8 +1,10 @@
 import type { TvState } from "@/lib/state/types";
-import { VIEW_IDS, type ViewId } from "@/i18n/ro";
+import { LIVE_VIEW_ID, type ViewId } from "@/i18n/ro";
 import { formatClock, formatDuration } from "@/lib/time/bucharest";
 
 export const POLL_MS = 30_000;
+
+const VIEW_ID_RE = /^[a-z][a-z0-9-]{0,39}$/;
 
 /** Soft rotation endpoint. Pass `view` only when advancing after dwell — never change the Cast URL. */
 export function tvStatePath(view?: ViewId | null): string {
@@ -31,8 +33,9 @@ export function nextTvState(current: TvState, incoming: unknown): TvState {
 }
 
 export function parseViewId(value: string | null | undefined): ViewId | null {
-  if (!value) return null;
-  return VIEW_IDS.includes(value as ViewId) ? (value as ViewId) : null;
+  if (!value || !VIEW_ID_RE.test(value)) return null;
+  if (value === LIVE_VIEW_ID) return LIVE_VIEW_ID;
+  return value;
 }
 
 /** Keep token and other params; force the next SSR view for Cast / classic reload. */

@@ -108,7 +108,7 @@ describe("smart rules", () => {
       personId: "alex",
     });
     const on = buildTvState(snapshot, morning, "vision");
-    assert.equal(on.vision?.cards.some((card) => card.body?.includes("Aniversare")), true);
+    assert.equal(on.vision?.cards.some((card) => card.id === "celebration" && card.body === "Aniversare azi"), true);
     assert.equal(on.notices.some((notice) => notice.id === "celebrations"), true);
 
     snapshot.config.rules.celebrations = false;
