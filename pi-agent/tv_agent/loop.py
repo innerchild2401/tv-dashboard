@@ -50,9 +50,28 @@ def run_once(step_input: LoopInput) -> None:
         try:
             step_input.play_hls()
         except Exception:
-            note_failure(memory, step_input.now, settings)
-            remember(memory, "hls cast failed")
+            # Never leave a dead Default Media Receiver: clear hands-off and restore DashCast.
+            memory.hands_off_until = 0.0
+            restored = False
+            if step_input.cast_recover is not None:
+                try:
+                    step_input.cast_recover()
+                    restored = True
+                    memory.last_cast_url = step_input.expected_url
+                    memory.last_cast_at = step_input.wall_iso
+                    memory.last_cast_mono = step_input.now
+                except Exception:
+                    remember(memory, "hls cast failed; recover failed")
+            if restored:
+                note_success(memory)
+                remember(memory, "hls cast failed; dashcast restored")
+            else:
+                note_failure(memory, step_input.now, settings)
+                if step_input.cast_recover is None:
+                    remember(memory, "hls cast failed")
         else:
+            minutes = decided.play_hls_minutes if 1 <= decided.play_hls_minutes <= 180 else 60
+            memory.hands_off_until = step_input.now + minutes * 60
             note_success(memory)
             remember(memory, "hls cast ok")
     elif decided.cast:

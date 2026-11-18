@@ -56,19 +56,32 @@ def load(config: Config, *, relaunch: bool = False) -> None:
 # Free Antena 3 HLS master (same URL as the dashboard). No secrets.
 ANTENA3_HLS_URL = "https://live3vox.antenaplay.ro/a3free/a3free.m3u8"
 
+# Player states that mean the receiver is actually consuming media (not a black zombie).
+_ACTIVE_MEDIA_STATES = frozenset({"PLAYING", "BUFFERING"})
+
 
 def play_hls(config: Config, url: str = ANTENA3_HLS_URL) -> None:
-    """Leave DashCast and play HLS on the Default Media Receiver (sound works).
+    """Cast Antena 3 HLS as native media with volume, then verify playback.
 
-    Prefer soft in-page pin on this Chromecast — cast_hls has left DMR black and
-    blocked DashCast until a Pi reboot. Kept for manual / remote experiments.
+    Chosen path (HH-32): hardened ``pychromecast`` ``MediaController`` on the
+    Default Media Receiver. Alternatives considered and skipped:
+
+    - ``catt``: same DMR underneath, extra Pi dependency.
+    - Custom Cast receiver: needs a Cast developer app + hosted receiver.
+    - Fragile fire-and-forget DMR (HH-30/31): left this TV black / unrecovered.
+
+    Safety contract: if media does not reach PLAYING/BUFFERING with content
+    within the discovery timeout, raise — the watchdog loop must quit the media
+    app and restore DashCast so Cast is never left dead. Soft in-page pin on the
+    dashboard remains the secondary fallback when this path fails or is skipped.
     """
     cast, browser = _connect(config)
     try:
         if cast is None:
             raise RuntimeError("chromecast not found")
-        cast.wait(timeout=config.discovery_timeout_seconds)
-        # application/x-mpegURL is what Chromecast DMR expects for HLS live.
+        timeout = float(config.discovery_timeout_seconds)
+        cast.wait(timeout=timeout)
+        # application/x-mpegURL is what Chromecast expects for HLS live.
         cast.media_controller.play_media(
             url,
             "application/x-mpegURL",
@@ -76,9 +89,45 @@ def play_hls(config: Config, url: str = ANTENA3_HLS_URL) -> None:
             autoplay=True,
             title="Antena 3",
         )
-        cast.media_controller.block_until_active(timeout=float(config.discovery_timeout_seconds))
+        cast.media_controller.block_until_active(timeout=timeout)
+        _ensure_audible_volume(cast)
+        if not _wait_media_active(cast, timeout):
+            raise RuntimeError("hls media not playing")
+        log.info("cast_hls: media active on %s", getattr(cast, "app_id", None) or "?")
     finally:
         _close(cast, browser)
+
+
+def _ensure_audible_volume(cast) -> None:
+    """Floor a near-silent Cast volume so live TV is actually heard."""
+    try:
+        status = getattr(cast, "status", None)
+        level = getattr(status, "volume_level", None) if status is not None else None
+        muted = bool(getattr(status, "volume_muted", False)) if status is not None else False
+        if muted:
+            cast.set_volume_muted(False)
+        if level is None or float(level) < 0.15:
+            cast.set_volume(0.4)
+            log.info("cast_hls: volume raised to 0.4 (was %s muted=%s)", level, muted)
+    except Exception as exc:  # noqa: BLE001 — volume is best-effort
+        log.warning("cast_hls: volume adjust failed: %s", exc)
+
+
+def _wait_media_active(cast, timeout: float) -> bool:
+    """True when MediaController reports PLAYING/BUFFERING with a content id/type."""
+    deadline = time.monotonic() + max(3.0, timeout)
+    mc = cast.media_controller
+    while time.monotonic() < deadline:
+        try:
+            status = mc.status
+        except Exception:  # noqa: BLE001
+            status = None
+        state = (getattr(status, "player_state", None) or "").upper()
+        content = getattr(status, "content_id", None) or getattr(status, "content_type", None)
+        if state in _ACTIVE_MEDIA_STATES and content:
+            return True
+        time.sleep(0.4)
+    return False
 
 
 def _relaunch_dashcast(cast, config: Config) -> None:

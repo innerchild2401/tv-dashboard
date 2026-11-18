@@ -234,6 +234,36 @@ class WatchdogTest(unittest.TestCase):
         tick(memory, 30, dmr, [], casts, beats, hls=hls)
         self.assertEqual(casts, [])
 
+    def test_cast_hls_failure_restores_dashcast_without_hands_off(self):
+        showing = Sight(looked=True, found=True, app_id=DASH_APP_ID, app_name="DashCast", dash_url=URL)
+        recovers = []
+        memory = Memory()
+
+        def boom():
+            raise RuntimeError("hls media not playing")
+
+        run_once(
+            LoopInput(
+                settings=Settings(),
+                memory=memory,
+                now=0,
+                expected_url=URL,
+                commands=[Command("1", "cast_hls", 15)],
+                sight=showing,
+                cast=lambda: None,
+                cast_recover=lambda: recovers.append(0),
+                play_hls=boom,
+                heartbeat=lambda _payload: None,
+                wall_iso="2026-11-08T10:00:00+00:00",
+                uptime_seconds=0,
+                local_ip="192.168.1.20",
+            )
+        )
+        self.assertEqual(recovers, [0])
+        self.assertEqual(memory.hands_off_until, 0)
+        self.assertEqual(memory.backoff_step, 0)
+        self.assertIn("dashcast restored", " ".join(memory.log))
+
     def test_cast_now_beats_cast_hls_and_recovers_from_dmr(self):
         dmr = Sight(looked=True, found=True, app_id="CC1AD845", app_name="Default Media Receiver")
         casts = []

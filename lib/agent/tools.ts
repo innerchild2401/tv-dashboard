@@ -111,7 +111,7 @@ const liveStartInput = z.object({
     .min(1)
     .max(180)
     .optional()
-    .describe("How long to keep Antena 3 before auto-return. Default 60. Soft in-page pin — no DashCast relaunch."),
+    .describe("How long to keep Antena 3 before auto-return. Default 60. Soft pin + Pi media hands-off window."),
 });
 const cardInput = z.object({
   externalId: z.string().trim().min(1).max(200).describe("Stable idempotency key. The same value updates the existing card."),
@@ -360,13 +360,14 @@ export const TOOL_CATALOG: { name: ToolName; title: string; description: string;
     name: "start_antena3_live",
     title: "Start Antena 3 live",
     description:
-      "On-demand only: soft-pin fullscreen Antena 3 CNN live inside the dashboard (free HLS; Cast autoplay then unmute for sound — no VAST/IMA page). MUST NOT be in default rotation. Prefer after Alex asks. No DashCast relaunch. Optional minutes (default 60, max 180).",
+      "On-demand only: soft-pin Antena 3 in-page AND queue Pi cast_hls (native Chromecast media with volume — tv-agent ≥5 verifies PLAYING then hands off; on failure restores DashCast). MUST NOT be in default rotation. Prefer after Alex asks. Optional minutes (default 60, max 180).",
     input: liveStartInput,
   },
   {
     name: "stop_antena3_live",
     title: "Stop Antena 3 live",
-    description: "Leave Antena 3 live and return to the normal dashboard rotation (soft in-page).",
+    description:
+      "Leave Antena 3 live, clear the soft pin, and queue Pi cast_now so tv-agent quits the media app and restores DashCast with retries.",
     input: emptyInput,
   },
   {
@@ -691,7 +692,7 @@ function schemaOf(): Outcome {
           viewId: "antena3",
           tools: ["start_antena3_live", "stop_antena3_live"],
           description:
-            "On-demand Antena 3 CNN live fullscreen with sound. Not in default rotation. Soft in-page pin (DashCast force=false). Free HLS only (no VAST/IMA page iframe — ads block Cast).",
+            "On-demand Antena 3 CNN live with sound. Not in default rotation. Soft in-page pin (secondary) + Pi cast_hls native media (tv-agent ≥5 verifies PLAYING + volume; failure restores DashCast). stop queues cast_now. Free HLS only (no VAST/IMA page iframe).",
         },
         home: {
           viewId: "home",
@@ -1621,17 +1622,22 @@ async function startAntena3Live(store: AgentStore, args: unknown, now: Date): Pr
   };
   await store.putControl(next);
   const warnings = [
-    "soft in-page pin only (cast_hls disabled — Default Media Receiver crashed DashCast on this Chromecast)",
+    "soft in-page pin (secondary) + Pi cast_hls native media when tv-agent ≥5",
+    "Pi verifies PLAYING/BUFFERING + volume; on failure quits media and restores DashCast",
     "keep dashcast_force=false on the Pi",
     "TV soft-reloads when /api/state buildId changes (Cast JS cache)",
-    "if stream stalls ~12s the TV abandons the pin and returns to rotation",
+    "if in-page stream stalls ~12s the TV abandons the pin and returns to rotation",
   ];
   const probe = await probeHlsUrl(ANTENA3_STREAM_URL);
   if (!probe.ok || !probe.looksLikeHls) {
     warnings.push("HLS master was not reachable from the server — TV may show the stuck fallback");
   }
-  // Do not queue cast_hls: switching to Default Media Receiver (CC1AD845) left this
-  // Chromecast on a black/broken receiver and made DashCast recovery unreliable.
+  const queued = await queueCommand("cast_hls", minutes, now);
+  if (!queued.ok) {
+    warnings.push("Pi cast_hls was not queued — in-page player only until tv-agent ≥5 is installed");
+  } else {
+    warnings.push("queued cast_hls for Pi MediaController (verify + volume; DashCast restore on fail)");
+  }
   return done(success(LIVE_VIEW_ID, warnings), {
     control: current,
     expectControl: next,
