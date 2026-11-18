@@ -249,11 +249,11 @@ Grokbot calls `/mcp` (stateless Streamable HTTP, tools only). The same handlers 
 
 A run calls `get_view_design` (or `get_schema`) first, then `get_dashboard_state`, then `get_inbox` and `route_inbox_item` for anything still waiting, then `set_recap`, then `set_priority`, then `upsert_card` for the affirmation, weekly wins, and word of the month, then `upsert_events`, `upsert_task`, and `shopping_add`. Use stable ids such as `recap-2026-11-08`, `affirmation-2026-11-08`, `wins-2026-11-08`, and `word-2026-11-08`. The same id updates the existing row, so the routine can run twice.
 
-### Design tools (Grokbot)
+### Design tools (Grokbot / Panou Familie)
 
-Call `get_view_design` with an optional `viewId` (`today` | `week` | `momente` | `vision` | `home`) before editing a screen. It returns hard constraints and allowed knobs. `get_schema` embeds the same payload under `schema.design`. Stay inside those limits — no free-form HTML. Auth is still `Authorization: Bearer AGENT_TOKEN` on `/mcp` and `POST /api/agent/<tool>`.
+Call `get_view_design` with an optional `viewId` (`today` | `week` | `momente` | `vision` | `home` | `custom-page` | `antena3`) before editing a screen. It returns hard constraints and allowed knobs. `get_schema` embeds the same payload under `schema.design`, plus `schema.pages` and `schema.live`. Stay inside those limits — no free-form HTML. Auth is still `Authorization: Bearer AGENT_TOKEN` on `/mcp` and `POST /api/agent/<tool>`.
 
-Victorii (view id `vision`) is a data-driven 4×3 board (max 12 cards). On `upsert_card` pass layout knobs: `grid` `{col,row,colSpan?,rowSpan?}` (spans max 2), `tilt` (−3…3), `fontScale` (`sm`|`md`|`lg`). Photos always use the polaroid frame. Call `upsert_card` with `kind: "photo"` and an HTTPS `image_url` (jpeg/png/webp/gif, max 5 MB). The server downloads the image into the private `photos` bucket and stores `data.storagePath`. Non-images and oversized files are refused. Prefer `https://`. Phone remote camera/gallery uploads still write the same `storagePath` field. Example:
+Victorii (view id `vision`) is a data-driven 4×3 board (max 12 cards). Every card kind should carry a readable `title` and `body` (affirmations use the scripture reference as `title`, e.g. `Efeseni 5:22`; wins use a hero title like `Bravo, Zian!`). On `upsert_card` pass layout knobs: `grid` `{col,row,colSpan?,rowSpan?}` (spans max 2), `tilt` (−3…3), `fontScale` (`sm`|`md`|`lg`). Photos always use the polaroid frame. Call `upsert_card` with `kind: "photo"` and an HTTPS `image_url` (jpeg/png/webp/gif, max 5 MB). The server downloads the image into the private photos bucket and stores `data.storagePath`. Non-images and oversized files are refused. Prefer `https://`. Phone remote camera/gallery uploads still write the same `storagePath` field. Example:
 
 ```json
 {
@@ -274,6 +274,26 @@ Victorii (view id `vision`) is a data-driven 4×3 board (max 12 cards). On `upse
 Momente (view id `momente`) shows countdown spotlights — all active items up to 12, with gallery/packed layouts for 7+. Call `get_schema` / `get_view_design` for the contract, or use `upsert_spotlight` / `delete_spotlight`. Countdown is whole Europe/Bucharest calendar days until `startsAt` (0 = azi). Seeded samples use `spotlight-vacanta-sample` and `spotlight-deadline-sample`; delete those external ids to clear them.
 
 Acasă (view id `home`) is a post-it board of tasks, grocery items, and family messages. Call `get_schema` for `schema.home`, or use `upsert_task` / `delete_task`, `shopping_add` / `shopping_check` / `shopping_delete`, and `upsert_message` / `delete_message`. Message colors are `butter | peach | mint | sky | rose | lemon`. Seeded sample message external id: `msg-welcome`.
+
+### Custom pages (rotation)
+
+`upsert_page` / `delete_page` add full-screen Romanian pages (title + body only) into Cast rotation. Ids are lowercase slugs (`reguli-familie`). Reserved: `today`, `week`, `momente`, `vision`, `home`, `antena3`. Pass `enabled: true` to rotate the page; `enabled: false` keeps the content but skips it. `get_view_design({ viewId: "custom-page" })` returns the contract. Example:
+
+```json
+{
+  "id": "reguli-familie",
+  "title": "Reguli",
+  "body": "Fără telefon la masă",
+  "enabled": true,
+  "dwellSeconds": 120
+}
+```
+
+### Antena 3 live (on demand only)
+
+`start_antena3_live` / `stop_antena3_live` are **not** part of the default rotation. Start only when Alex asks. The TV soft-pins an in-page fullscreen player (official free HLS first; falls back to an iframe of `https://www.antena3.ro/live/`). Optional `minutes` (default 60, max 180) auto-returns to rotation. `stop_antena3_live` returns immediately.
+
+**Pi / DashCast:** keep `dashcast_force = false`. Do **not** call `load_url` for live start/stop — the dashboard switches in-page via `/api/state` + Realtime. After pulling `pi-agent`, restart `tv-agent` only if the watchdog binary changed; live itself needs no Pi change.
 
 ### Chromecast / Pi notes (flicker)
 

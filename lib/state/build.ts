@@ -1,5 +1,6 @@
-import { ro, type ViewId } from "@/i18n/ro";
-import { activeHold, ROTATE_CONTROL, type DisplayControl } from "@/lib/remote/hold";
+import { LIVE_VIEW_ID, isCoreViewId, ro, viewLabel, type ViewId } from "@/i18n/ro";
+import { ANTENA3_LIVE } from "@/lib/live/antena3";
+import { activeHold, isOverlayView, ROTATE_CONTROL, type DisplayControl } from "@/lib/remote/hold";
 import { accentColor } from "@/lib/theme/accent";
 import { peekNextView } from "@/lib/rotation/engine";
 import { activePriority, evaluateRules, rotationPool } from "@/lib/rotation/rules";
@@ -19,6 +20,7 @@ export function buildTvState(
   forceView?: ViewId | null,
   control: DisplayControl = ROTATE_CONTROL,
 ): TvState {
+  const pages = snapshot.config.pages ?? [];
   const configured = viewCandidates(snapshot, now);
   const smart = evaluateRules({
     now,
@@ -31,7 +33,13 @@ export function buildTvState(
   });
   const enabled = configured.map((view) => view.id);
   const held = activeHold(control, now, enabled);
-  const forced = forceView && enabled.includes(forceView) ? forceView : null;
+  const known =
+    forceView &&
+    (enabled.includes(forceView) ||
+      isOverlayView(forceView) ||
+      pages.some((page) => page.id === forceView) ||
+      snapshot.config.views.some((view) => view.id === forceView));
+  const forced = known ? forceView : null;
   const current = forced ?? held.viewId ?? smart.viewId;
   const active = configured.find((view) => view.id === current);
   const dwellSeconds = active?.dwellSeconds ?? smart.dwellSeconds;
@@ -42,7 +50,9 @@ export function buildTvState(
   if (forced || !held.viewId) hold = "rotate";
   if (!forced && held.viewId && held.mode === "pinned" && control.pinnedUntil) {
     until = control.pinnedUntil;
-    reason = `${ro.pinnedUntil} ${formatClock(new Date(control.pinnedUntil))}`;
+    reason = isOverlayView(held.viewId)
+      ? `${ro.liveTv} · ${ro.liveTvHint}`
+      : `${ro.pinnedUntil} ${formatClock(new Date(control.pinnedUntil))}`;
     quiet = false;
   } else if (!forced && held.mode === "paused" && held.viewId) {
     until = new Date(now.getTime() + 86_400_000).toISOString();
@@ -53,7 +63,7 @@ export function buildTvState(
     reason = ro.lockedView;
     quiet = false;
   }
-  const nextView = resolveNextView(snapshot, current, until);
+  const nextView = isOverlayView(current) ? smart.viewId : resolveNextView(snapshot, current, until);
   const priority = activePriority(snapshot.priorities, now);
   const visible = quiet ? null : current;
   const calendarNote = updatedLabel(snapshot.calendarFetchedAt, now, CALENDAR_INTERVAL_MS);
@@ -66,16 +76,10 @@ export function buildTvState(
     weather: snapshot.weather,
     viewIds: configured.map((view) => view.id),
     dwellSeconds,
-    activeView: current,
+    activeView: isCoreViewId(current) ? current : configured[0]?.id ?? "today",
   });
 
-  const empty = {
-    today: null,
-    week: null,
-    momente: null,
-    vision: null,
-    home: null,
-  };
+  const customPage = pages.find((page) => page.id === visible) ?? null;
 
   return {
     ok: true,
@@ -104,16 +108,24 @@ export function buildTvState(
       theme: snapshot.config.theme.mode,
       pills: configured.map((view) => ({
         id: view.id,
-        label: ro.views[view.id],
+        label: viewLabel(view.id, pages),
         active: view.id === current,
       })),
     },
-    ...empty,
     today: visible === "today" ? { ...todayBody(today), updatedLabel: calendarNote } : null,
     week: visible === "week" ? { ...projectWeek(snapshot, now), updatedLabel: calendarNote } : null,
     momente: visible === "momente" ? projectMomente(snapshot, now) : null,
     vision: visible === "vision" ? projectVision(snapshot, now, celebrationText(smart.celebrations, "vision")) : null,
     home: visible === "home" ? projectHome(snapshot, now) : null,
+    page: customPage ? { id: customPage.id, title: customPage.title, body: customPage.body } : null,
+    live:
+      visible === LIVE_VIEW_ID
+        ? {
+            ...ANTENA3_LIVE,
+            label: ro.liveTv,
+            hint: ro.liveTvHint,
+          }
+        : null,
   };
 }
 

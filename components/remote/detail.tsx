@@ -1,13 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { ro, VIEW_IDS, type ViewId } from "@/i18n/ro";
+import { isCoreViewId, ro, type CoreViewId } from "@/i18n/ro";
 import { formatClock, formatLongDate } from "@/lib/time/bucharest";
 import { useRemote } from "@/components/remote/provider";
 
 export function Detail({ view }: { view: string }) {
   const { board } = useRemote();
-  if (!VIEW_IDS.includes(view as ViewId)) {
+  if (!isCoreViewId(view)) {
     return (
       <section className="stack">
         <h1>{ro.remote.notFound}</h1>
@@ -15,7 +15,7 @@ export function Detail({ view }: { view: string }) {
       </section>
     );
   }
-  const id = view as ViewId;
+  const id: CoreViewId = view;
   return (
     <section className="stack">
       <a href="/remote">{ro.remote.back}</a>

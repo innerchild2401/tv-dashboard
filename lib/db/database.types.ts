@@ -114,6 +114,7 @@ export type Database = {
         Row: {
           id: number
           location: Json
+          pages: Json
           people: Json
           profiles: Json
           quiet_hours: Json
@@ -125,6 +126,7 @@ export type Database = {
         Insert: {
           id?: number
           location: Json
+          pages?: Json
           people: Json
           profiles: Json
           quiet_hours: Json
@@ -136,6 +138,7 @@ export type Database = {
         Update: {
           id?: number
           location?: Json
+          pages?: Json
           people?: Json
           profiles?: Json
           quiet_hours?: Json

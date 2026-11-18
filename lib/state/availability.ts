@@ -1,4 +1,4 @@
-import type { ViewId } from "@/i18n/ro";
+import { LIVE_VIEW_ID, isCoreViewId, type ViewId } from "@/i18n/ro";
 import { STALE_AFTER_MS } from "@/lib/seed/sample-metrics";
 import type { RotationCandidate } from "@/lib/rotation/engine";
 import { addDays, dateKey, zonedParts, type DateParts } from "@/lib/time/bucharest";
@@ -7,11 +7,11 @@ import type { Snapshot, SnapshotMetric } from "@/lib/state/types";
 export function viewCandidates(snapshot: Snapshot, now: Date): RotationCandidate[] {
   const flags = availability(snapshot, now);
   return [...snapshot.config.views]
-    .filter((view) => view.enabled)
+    .filter((view) => view.enabled && view.id !== LIVE_VIEW_ID)
     .sort((left, right) => left.order - right.order)
     .map((view) => {
       const id = view.id as ViewId;
-      const flag = flags[id] ?? { empty: true, stale: false };
+      const flag = flags[id] ?? { empty: false, stale: false };
       return {
         id,
         weight: view.weight,
@@ -22,7 +22,7 @@ export function viewCandidates(snapshot: Snapshot, now: Date): RotationCandidate
     });
 }
 
-export function availability(snapshot: Snapshot, now: Date): Record<ViewId, { empty: boolean; stale: boolean }> {
+export function availability(snapshot: Snapshot, now: Date): Record<string, { empty: boolean; stale: boolean }> {
   const parts = zonedParts(now);
   const today: DateParts = { year: parts.year, month: parts.month, day: parts.day };
   const lead = addDays(today, parts.hour >= snapshot.config.rules.todayLeadTomorrowHour ? 1 : 0);
@@ -49,13 +49,22 @@ export function availability(snapshot: Snapshot, now: Date): Record<ViewId, { em
     return target >= current;
   });
 
-  return {
+  const flags: Record<string, { empty: boolean; stale: boolean }> = {
     today: { empty: !todayEvents, stale: false },
     week: { empty: !weekEvents, stale: false },
     momente: { empty: !momenteLive, stale: false },
     vision: { empty: !cards, stale: false },
     home: { empty: homeEmpty, stale: false },
   };
+
+  for (const page of snapshot.config.pages ?? []) {
+    flags[page.id] = { empty: !page.title.trim() && !page.body.trim(), stale: false };
+  }
+  for (const view of snapshot.config.views) {
+    if (isCoreViewId(view.id) || flags[view.id]) continue;
+    flags[view.id] = { empty: true, stale: false };
+  }
+  return flags;
 }
 
 export function sourceIsStale(metrics: SnapshotMetric[], prefix: string, now: Date): boolean {

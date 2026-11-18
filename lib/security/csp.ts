@@ -6,6 +6,7 @@
 
 const SUPABASE_HTTPS = "https://*.supabase.co";
 const SUPABASE_WSS = "wss://*.supabase.co";
+const ANTENA_MEDIA = "https://*.antenaplay.ro https://*.antena3.ro https://www.antena3.ro";
 
 export function isTvDocument(pathname: string): boolean {
   return pathname === "/tv" || pathname.startsWith("/tv/");
@@ -19,6 +20,7 @@ export function contentSecurityPolicy(options: { pathname: string; nonce: string
     "'strict-dynamic'",
     ...(options.development ? ["'unsafe-eval'"] : []),
   ];
+  const tv = isTvDocument(options.pathname);
   const directives = [
     "default-src 'self'",
     `script-src ${script.join(" ")}`,
@@ -26,17 +28,19 @@ export function contentSecurityPolicy(options: { pathname: string; nonce: string
     "style-src-attr 'unsafe-inline'",
     `img-src 'self' blob: data: ${SUPABASE_HTTPS}`,
     "font-src 'self'",
-    `connect-src 'self' ${SUPABASE_HTTPS} ${SUPABASE_WSS}`,
+    `connect-src 'self' ${SUPABASE_HTTPS} ${SUPABASE_WSS}${tv ? ` ${ANTENA_MEDIA}` : ""}`,
     "worker-src 'self'",
     "manifest-src 'self'",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
-    "frame-src 'none'",
+    tv ? `media-src 'self' blob: ${ANTENA_MEDIA}` : "media-src 'self'",
+    // On-demand Antena 3 may fall back to the official live page in an iframe.
+    tv ? `frame-src 'self' ${ANTENA_MEDIA}` : "frame-src 'none'",
   ];
   // /tv must stay embeddable for DashCast iframe (force=false). Explicit allow-all
   // documents the contract; other routes stay unframeable.
-  if (isTvDocument(options.pathname)) directives.push("frame-ancestors *");
+  if (tv) directives.push("frame-ancestors *");
   else directives.push("frame-ancestors 'none'");
   if (!options.development) directives.push("upgrade-insecure-requests");
   return directives.join("; ");

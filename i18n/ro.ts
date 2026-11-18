@@ -98,6 +98,11 @@ export const ro = {
   lockedView: "Blocat",
   pinnedUntil: "Fixat până la",
   inboxWaiting: "în inbox",
+  liveTv: "Antena 3 Live",
+  liveTvHint: "Pornit la cerere — nu e în rotație",
+  liveTvLoading: "Pornesc Antena 3…",
+  liveTvFailed: "Nu pot porni fluxul. Încerc pagina oficială.",
+  customPageEmpty: "Pagina nu are conținut încă",
   remote: {
     notConfigured: "Telefonul nu este configurat.",
     signedOut: "Sesiunea a expirat.",
@@ -285,12 +290,26 @@ export function attemptsLeft(count: number): string {
   return count === 1 ? "Mai ai o încercare." : `Mai ai ${count} încercări.`;
 }
 
-export type ViewId = keyof typeof ro.views;
+export type CoreViewId = keyof typeof ro.views;
+/** Built-in or MCP custom page id (and on-demand `antena3`). */
+export type ViewId = string;
 
-export const VIEW_IDS: ViewId[] = ["today", "week", "momente", "vision", "home"];
+export const VIEW_IDS: CoreViewId[] = ["today", "week", "momente", "vision", "home"];
+export const LIVE_VIEW_ID = "antena3";
+export const RESERVED_VIEW_IDS = new Set<string>([...VIEW_IDS, LIVE_VIEW_ID]);
 
-export function rotationReason(id: ViewId, weight: number): string {
-  return `${ro.views[id]} · ${ro.weight} ${weight}`;
+export function isCoreViewId(id: string): id is CoreViewId {
+  return (VIEW_IDS as readonly string[]).includes(id);
+}
+
+export function viewLabel(id: ViewId, pages: { id: string; title: string }[] = []): string {
+  if (isCoreViewId(id)) return ro.views[id];
+  if (id === LIVE_VIEW_ID) return ro.liveTv;
+  return pages.find((page) => page.id === id)?.title ?? id;
+}
+
+export function rotationReason(id: ViewId, weight: number, pages: { id: string; title: string }[] = []): string {
+  return `${viewLabel(id, pages)} · ${ro.weight} ${weight}`;
 }
 
 export function profileLabel(id: string): string {
@@ -309,7 +328,11 @@ export function prioritySoon(minutes: number): string {
 }
 
 export function celebrationDay(title: string): string {
-  return `${ro.celebrationDay}: ${title}`;
+  const trimmed = title.trim();
+  if (!trimmed || /^aniversare$/i.test(trimmed)) return ro.celebrationDay;
+  const stripped = trimmed.replace(/^(zi(?:ua)?\s+de\s+na[sș]tere|aniversare)\s*[:\-]?\s*/i, "").trim();
+  if (!stripped) return ro.celebrationDay;
+  return `${ro.celebrationDay}: ${stripped}`;
 }
 
 export function aboveAverage(view: string): string {

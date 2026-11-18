@@ -149,6 +149,19 @@ export const prioritySchema = z.object({
   locked: z.boolean(),
 });
 
+const pageIdSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(40)
+  .regex(/^[a-z][a-z0-9-]*$/, "page id must be lowercase letters, numbers, dashes");
+
+export const customPageSchema = z.object({
+  id: pageIdSchema,
+  title: z.string().trim().min(1).max(80),
+  body: z.string().max(2000).default(""),
+});
+
 export const configSchema = z.object({
   theme: z.object({
     mode: z.enum(["dark", "light"]),
@@ -171,6 +184,7 @@ export const configSchema = z.object({
       weight: z.number().positive(),
     }),
   ),
+  pages: z.array(customPageSchema).default([]),
   profiles: z.array(
     z.object({
       id: z.string().min(1),

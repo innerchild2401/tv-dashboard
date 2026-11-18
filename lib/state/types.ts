@@ -205,6 +205,20 @@ export type VisionCardModel = {
 
 export type VisionModel = { cards: VisionCardModel[]; celebration: string | null };
 
+export type CustomPageModel = {
+  id: string;
+  title: string;
+  body: string;
+};
+
+export type LiveModel = {
+  provider: "antena3";
+  pageUrl: string;
+  streamUrl: string;
+  label: string;
+  hint: string;
+};
+
 export type HomeStickyKind = "task" | "shopping" | "message";
 
 export type HomeSticky = {
@@ -246,6 +260,8 @@ export type TvState = {
   momente: MomenteModel | null;
   vision: VisionModel | null;
   home: HomeModel | null;
+  page: CustomPageModel | null;
+  live: LiveModel | null;
 };
 
 export type { AgendaItem };
