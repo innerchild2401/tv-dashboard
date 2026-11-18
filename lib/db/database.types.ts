@@ -122,6 +122,7 @@ export type Database = {
           theme: Json
           updated_at: string
           views: Json
+          vision_draft: Json | null
         }
         Insert: {
           id?: number
@@ -134,6 +135,7 @@ export type Database = {
           theme: Json
           updated_at?: string
           views: Json
+          vision_draft?: Json | null
         }
         Update: {
           id?: number
@@ -146,6 +148,7 @@ export type Database = {
           theme?: Json
           updated_at?: string
           views?: Json
+          vision_draft?: Json | null
         }
         Relationships: []
       }

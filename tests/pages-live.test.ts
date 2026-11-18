@@ -68,7 +68,7 @@ describe("custom pages and antena3 live", () => {
   });
 
   it("formats celebration without Aniversare azi: Aniversare", () => {
-    assert.equal(celebrationDay("Aniversare"), "Aniversare azi");
+    assert.equal(celebrationDay("Aniversare"), null);
     assert.equal(celebrationDay("Ziua de naștere Zian"), "Aniversare azi: Zian");
   });
 });

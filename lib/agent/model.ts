@@ -13,6 +13,8 @@ export const TOOL_NAMES = [
   "delete_page",
   "start_antena3_live",
   "stop_antena3_live",
+  "preview_layout",
+  "publish_layout",
   "set_recap",
   "set_priority",
   "get_inbox",
@@ -50,6 +52,8 @@ export type ToolResult = {
   state?: unknown;
   items?: unknown[];
   schema?: unknown;
+  previewUrl?: string;
+  draft?: unknown;
 };
 
 export type CardRecord = {
@@ -253,6 +257,8 @@ export interface AgentStore {
     pages: { id: string; title: string; body: string }[];
     views: ViewRow[];
   }): Promise<void>;
+  visionDraft(): Promise<unknown | null>;
+  putVisionDraft(draft: unknown | null): Promise<void>;
   cards(): Promise<CardRecord[]>;
   putCard(card: CardRecord): Promise<void>;
   events(): Promise<EventRecord[]>;

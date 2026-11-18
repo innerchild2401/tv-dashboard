@@ -21,13 +21,19 @@ export const VISION_DESIGN = {
   photoFrame: "polaroid" as const,
   colors: ["sand", "coral", "lilac", "mint", "sky", "pink"] as const,
   kinds: ["photo", "affirmation", "countdown", "word", "progress", "wins", "recap", "note"] as const,
-  tools: ["upsert_card", "delete_card", "set_recap"] as const,
-  knobs: ["grid", "tilt", "fontScale", "color", "kind", "title", "body", "image_url"] as const,
+  tools: ["upsert_card", "delete_card", "set_recap", "preview_layout", "publish_layout"] as const,
+  knobs: ["grid", "tilt", "fontScale", "hidden", "color", "kind", "title", "body", "image_url", "autoSize"] as const,
+  canvas: TV_DESIGN.canvas,
   rules: [
     "Call get_view_design or get_schema before writing.",
-    "Layout is data-driven: pass grid {col,row,colSpan,rowSpan}, tilt, and fontScale on upsert_card.",
+    "Design canvas is 1280×720, letterboxed into 1920×1080 Cast/LG (×1.35 inside 10% overscan-safe area).",
+    "Layout is data-driven: pass grid {col,row,colSpan,rowSpan}, tilt, fontScale, hidden on upsert_card.",
     "Grid is 4×3. col 0–3, row 0–2. col+colSpan≤4, row+rowSpan≤3. Spans max 2.",
-    "Max 12 live cards. Overlap is warned; prefer empty cells.",
+    "Max 12 live cards. Overlaps are auto-packed into free cells — never stacked.",
+    "Panou Familie can rearrange/resize/hide ALL cards (samples + system: Rezumat, Pachetul, wins).",
+    "Omit grid/fontScale (or autoSize:true) to size beautifully from message length.",
+    "Multi-card changes: preview_layout (PNG at 1280×720) → review → publish_layout (atomic).",
+    "Empty/self-referential Aniversare azi is hidden — only real named anniversaries show.",
     "Every kind should show title + body on TV (wins: hero title e.g. Bravo, Zian!; affirmation: scripture ref as title; countdown: include body).",
     "Photos always render in the polaroid frame — no custom HTML/CSS.",
     "fontScale is sm|md|lg only. Romanian copy preferred. Soft pastel palette on Cast.",
@@ -134,6 +140,7 @@ export function viewDesignPayload(viewId?: string | null) {
     "Auth: Authorization Bearer AGENT_TOKEN on /mcp and POST /api/agent/<tool>.",
     "Romanian UI copy where user-facing.",
     "Custom pages: upsert_page / delete_page. Antena 3: start_antena3_live / stop_antena3_live (never default rotation).",
+    "Victorii rearranges: preview_layout → PNG → publish_layout. upsert_card can hide samples via hidden:true.",
   ];
   if (viewId === "antena3" || viewId === "live") {
     return { canvas: TV_DESIGN.canvas, instructions, view: LIVE_DESIGN };

@@ -1,5 +1,6 @@
 import { ro } from "@/i18n/ro";
 import { parseFontScale } from "@/lib/agent/design";
+import { isCardHidden } from "@/lib/agent/layout";
 import { formatCount } from "@/lib/format/display";
 import { personChip } from "@/lib/people";
 import type {
@@ -12,14 +13,18 @@ import type {
   VisionModel,
 } from "@/lib/state/types";
 import { dateKey, zonedParts } from "@/lib/time/bucharest";
+import { packVisionCards } from "@/lib/views/pack";
 
 const STICKY_COLORS: HomeStickyColor[] = ["butter", "peach", "mint", "sky", "rose", "lemon"];
 
 export function projectVision(snapshot: Snapshot, now: Date, celebration?: string | null): VisionModel {
-  const cards = snapshot.cards
+  const mapped = snapshot.cards
     .filter((card) => !card.expiresAt || new Date(card.expiresAt).getTime() > now.getTime())
+    .filter((card) => !isCardHidden(card.data))
     .map((card) => toCard(card, snapshot, now));
-  if (celebration) {
+  const cards = packVisionCards(mapped);
+  const realCelebration = celebration?.trim() && celebration.trim() !== ro.celebrationDay ? celebration.trim() : null;
+  if (realCelebration) {
     const spot = freeCell(cards);
     cards.push({
       id: "celebration",
@@ -32,7 +37,7 @@ export function projectVision(snapshot: Snapshot, now: Date, celebration?: strin
       rowSpan: 1,
       fontScale: "md",
       title: ro.celebrationDay,
-      body: celebration,
+      body: realCelebration,
       word: null,
       countdownValue: null,
       countdownUnit: null,
@@ -42,7 +47,7 @@ export function projectVision(snapshot: Snapshot, now: Date, celebration?: strin
       photoUrl: null,
     });
   }
-  return { cards, celebration: celebration ?? null };
+  return { cards: packVisionCards(cards), celebration: realCelebration };
 }
 
 function freeCell(cards: VisionModel["cards"]): { col: number; row: number } {

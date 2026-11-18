@@ -97,18 +97,29 @@ describe("smart rules", () => {
     assert.ok(banner.chrome.priority);
   });
 
-  it("adds a celebration card for a birthday", () => {
+  it("adds a celebration card for a named birthday and hides bare Aniversare", () => {
     const snapshot = snapshotAt(morning);
     snapshot.events.push({
-      id: "birthday",
+      id: "birthday-empty",
       title: "Aniversare",
       start: morning.toISOString(),
       end: new Date(morning.getTime() + 60 * 60 * 1000).toISOString(),
       allDay: true,
       personId: "alex",
     });
+    const empty = buildTvState(snapshot, morning, "vision");
+    assert.equal(empty.vision?.cards.some((card) => card.id === "celebration"), false);
+
+    snapshot.events.push({
+      id: "birthday",
+      title: "Ziua de naștere Zian",
+      start: morning.toISOString(),
+      end: new Date(morning.getTime() + 60 * 60 * 1000).toISOString(),
+      allDay: true,
+      personId: "alex",
+    });
     const on = buildTvState(snapshot, morning, "vision");
-    assert.equal(on.vision?.cards.some((card) => card.id === "celebration" && card.body === "Aniversare azi"), true);
+    assert.equal(on.vision?.cards.some((card) => card.id === "celebration" && card.body === "Aniversare azi: Zian"), true);
     assert.equal(on.notices.some((notice) => notice.id === "celebrations"), true);
 
     snapshot.config.rules.celebrations = false;

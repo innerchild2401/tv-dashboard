@@ -66,9 +66,9 @@ export function sampleCards(now: Date): SnapshotCard[] {
       body: "Supuneți-vă unii altora în frica lui Hristos.",
       color: "sand",
       tilt: 2,
-      grid: { col: 0, row: 0, colSpan: 2, rowSpan: 1 },
+      grid: { col: 0, row: 0, colSpan: 2, rowSpan: 2 },
       expiresAt: null,
-      data: { text: "Supuneți-vă unii altora în frica lui Hristos." },
+      data: { text: "Supuneți-vă unii altora în frica lui Hristos.", fontScale: "lg" },
     },
     {
       id: "66666666-6666-4666-8666-666666666602",
@@ -77,9 +77,9 @@ export function sampleCards(now: Date): SnapshotCard[] {
       body: "Răbdare în fiecare zi",
       color: "lilac",
       tilt: -1,
-      grid: { col: 2, row: 0, colSpan: 1, rowSpan: 1 },
+      grid: { col: 3, row: 0, colSpan: 1, rowSpan: 1 },
       expiresAt: null,
-      data: { word: "Răbdare" },
+      data: { word: "Răbdare", fontScale: "sm" },
     },
     {
       id: "66666666-6666-4666-8666-666666666603",
@@ -88,9 +88,9 @@ export function sampleCards(now: Date): SnapshotCard[] {
       body: "Plecare spre munte",
       color: "sky",
       tilt: 1,
-      grid: { col: 3, row: 0, colSpan: 1, rowSpan: 1 },
+      grid: { col: 2, row: 0, colSpan: 1, rowSpan: 1 },
       expiresAt: null,
-      data: { target, label: "Vacanță" },
+      data: { target, label: "Vacanță", fontScale: "sm" },
     },
     {
       id: "66666666-6666-4666-8666-666666666604",
@@ -99,7 +99,7 @@ export function sampleCards(now: Date): SnapshotCard[] {
       body: "Easybox până diseară",
       color: "mint",
       tilt: -2,
-      grid: { col: 2, row: 1, colSpan: 1, rowSpan: 1 },
+      grid: { col: 0, row: 2, colSpan: 2, rowSpan: 1 },
       expiresAt: null,
       data: {
         label: "Pachetul",
@@ -107,6 +107,7 @@ export function sampleCards(now: Date): SnapshotCard[] {
         max: 1,
         style: "ring",
         evidence: "task:done:11111111-1111-4111-8111-111111111111",
+        fontScale: "sm",
       },
     },
     {
@@ -116,7 +117,7 @@ export function sampleCards(now: Date): SnapshotCard[] {
       body: "A terminat tema la mate",
       color: "coral",
       tilt: 1,
-      grid: { col: 0, row: 1, colSpan: 2, rowSpan: 2 },
+      grid: { col: 2, row: 1, colSpan: 1, rowSpan: 1 },
       expiresAt: null,
       data: {
         items: [
@@ -125,6 +126,7 @@ export function sampleCards(now: Date): SnapshotCard[] {
             evidence: "manual:sample",
           },
         ],
+        fontScale: "md",
       },
     },
     {
@@ -136,7 +138,7 @@ export function sampleCards(now: Date): SnapshotCard[] {
       tilt: -1,
       grid: { col: 2, row: 2, colSpan: 2, rowSpan: 1 },
       expiresAt: null,
-      data: { recapId: sampleRecap.id },
+      data: { recapId: sampleRecap.id, fontScale: "sm" },
     },
   ];
 }

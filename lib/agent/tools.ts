@@ -44,9 +44,17 @@ import { publishChange } from "@/lib/remote/publish";
 import { cardSchema, paletteTokenSchema } from "@/lib/schemas";
 import { endOfZonedDay, zonedParts, zonedTimeToUtc } from "@/lib/time/bucharest";
 import { LIVE_VIEW_ID, RESERVED_VIEW_IDS } from "@/i18n/ro";
+import { parseVisionDraft, suggestVisionPresentation, type VisionLayoutDraft, type VisionLayoutPlacement } from "@/lib/agent/layout";
 import { ROTATE_CONTROL, type DisplayControl } from "@/lib/remote/hold";
+import { packVisionCards } from "@/lib/views/pack";
 
-const READS = new Set<ToolName>(["get_dashboard_state", "get_schema", "get_view_design", "get_inbox"]);
+const READS = new Set<ToolName>([
+  "get_dashboard_state",
+  "get_schema",
+  "get_view_design",
+  "get_inbox",
+  "preview_layout",
+]);
 const DWELL_DEFAULT = 120;
 const KIND_COLOR: Record<CardKind, Palette> = {
   photo: "coral",
@@ -124,7 +132,15 @@ const cardInput = z.object({
     })
     .optional()
     .describe("4×3 Victorii grid placement. col+colSpan≤4, row+rowSpan≤3."),
-  fontScale: z.enum(["sm", "md", "lg"]).optional().describe("Constrained text size: sm|md|lg."),
+  fontScale: z.enum(["sm", "md", "lg"]).optional().describe("Constrained text size: sm|md|lg. Omit to auto-pick from message length."),
+  hidden: z
+    .boolean()
+    .optional()
+    .describe("Hide from Victorii without deleting. Use for samples/system cards (Rezumat, Pachetul, Aniversare)."),
+  autoSize: z
+    .boolean()
+    .optional()
+    .describe("When true (default if grid/fontScale omitted), pick fontScale + span from title/body length."),
   data: z
     .record(z.string(), z.unknown())
     .optional()
@@ -137,6 +153,33 @@ const cardInput = z.object({
     .describe(
       "HTTPS URL of a jpeg/png/webp/gif (max 5 MB). Only for kind=photo. The server downloads it into the private photos bucket and sets data.storagePath. Prefer https://. Rejects non-images and oversized files. Photos always use the polaroid frame.",
     ),
+});
+const layoutCardInput = z.object({
+  externalId: z.string().trim().min(1).max(200),
+  grid: z
+    .object({
+      col: z.number().int().min(0).max(3),
+      row: z.number().int().min(0).max(2),
+      colSpan: z.number().int().min(1).max(VISION_DESIGN.span.colSpanMax).optional(),
+      rowSpan: z.number().int().min(1).max(VISION_DESIGN.span.rowSpanMax).optional(),
+    })
+    .optional(),
+  fontScale: z.enum(["sm", "md", "lg"]).optional(),
+  hidden: z.boolean().optional(),
+  tilt: z.number().min(VISION_DESIGN.tilt.min).max(VISION_DESIGN.tilt.max).optional(),
+  title: z.string().max(200).optional(),
+  body: z.string().max(500).optional(),
+  kind: z.enum(["photo", "affirmation", "countdown", "word", "progress", "wins", "recap", "note"]).optional(),
+  color: paletteTokenSchema.optional(),
+});
+const previewLayoutInput = z.object({
+  cards: z
+    .array(layoutCardInput)
+    .min(1)
+    .max(VISION_DESIGN.maxCards)
+    .optional()
+    .describe("Draft placements. Omit to preview the live board after packing. Include samples/system cards by externalId."),
+  includeHidden: z.boolean().optional().describe("When true, also show cards marked hidden in the draft preview."),
 });
 const deleteInput = z.object({
   id: z.string().uuid().optional(),
@@ -279,10 +322,10 @@ export const TOOL_CATALOG: { name: ToolName; title: string; description: string;
     name: "upsert_card",
     title: "Upsert card",
     description:
-      "Create or update a Victorii card (viewId vision). Pass layout knobs: grid {col,row,colSpan?,rowSpan?}, tilt (-3…3), fontScale (sm|md|lg). Photos always use the polaroid frame. Same externalId updates. Manual/locked refused. Wins/progress need evidence. Photo: kind=photo + image_url (HTTPS).",
+      "Create or update ANY Victorii card (samples + system included) by externalId. Layout knobs: grid, tilt, fontScale, hidden. Overlaps are auto-packed into free cells — never left stacked. Omit grid/fontScale (or pass autoSize:true) to size from message length. Photos: kind=photo + image_url (HTTPS). Wins/progress need evidence. Prefer preview_layout → publish_layout for multi-card rearranges.",
     input: cardInput,
   },
-  { name: "delete_card", title: "Delete card", description: "Soft-delete a card the assistant owns. Pass id or externalId.", input: deleteInput },
+  { name: "delete_card", title: "Delete card", description: "Soft-delete a card the assistant owns. Pass id or externalId. Prefer hidden:true on upsert_card to hide samples without deleting.", input: deleteInput },
   {
     name: "upsert_spotlight",
     title: "Upsert Momente spotlight",
@@ -321,6 +364,20 @@ export const TOOL_CATALOG: { name: ToolName; title: string; description: string;
     name: "stop_antena3_live",
     title: "Stop Antena 3 live",
     description: "Leave Antena 3 live and return to the normal dashboard rotation (soft in-page).",
+    input: emptyInput,
+  },
+  {
+    name: "preview_layout",
+    title: "Preview Victorii layout",
+    description:
+      "Write a draft Victorii layout (all cards by externalId, including samples/system) and return a PNG preview URL at Cast design size 1280×720 (letterboxed on 1920×1080 LG). Packs overlaps into free cells. Review the image, then call publish_layout to apply atomically.",
+    input: previewLayoutInput,
+  },
+  {
+    name: "publish_layout",
+    title: "Publish Victorii layout",
+    description:
+      "Atomically apply the draft from preview_layout to live Victorii cards (grid/fontScale/hidden/tilt). Clears the draft. No-op if there is no draft.",
     input: emptyInput,
   },
   { name: "set_recap", title: "Daily recap", description: "Replace the assistant's daily recap text and recap card. Use a stable externalId such as recap-2026-11-08.", input: recapInput },
@@ -446,6 +503,8 @@ async function dispatch(store: AgentStore, name: ToolName, args: unknown, now: D
   if (name === "delete_page") return deletePage(store, args);
   if (name === "start_antena3_live") return startAntena3Live(store, args, now);
   if (name === "stop_antena3_live") return stopAntena3Live(store, now);
+  if (name === "preview_layout") return previewLayout(store, args, now);
+  if (name === "publish_layout") return publishLayout(store, now);
   if (name === "set_recap") return setRecap(store, args, now);
   if (name === "set_priority") return setPriority(store, args, now);
   if (name === "get_inbox") return listInbox(store, args);
@@ -699,10 +758,11 @@ function schemaOf(): Outcome {
         rules: [
           "A win or progress item needs evidence such as task:done:<id> or event:<id>.",
           "The same externalId updates the existing row, so a daily routine can run twice.",
-          "A manual or locked row is left unchanged.",
+          "Victorii cards (including samples/system) are editable for layout/hide via upsert_card; integration rows stay refused.",
           "A priority needs a reason and expires at the end of the day unless another time is given.",
           "Momente spotlights use upsert_spotlight / delete_spotlight. Day countdown is Bucharest calendar days, not hours.",
-          "Victorii photo cards: kind=photo + image_url (HTTPS). Server stores into the private photos bucket. Pass grid/tilt/fontScale for layout.",
+          "Victorii photo cards: kind=photo + image_url (HTTPS). Server stores into the private photos bucket. Pass grid/tilt/fontScale/hidden for layout.",
+          "Victorii multi-card: preview_layout (PNG 1280×720) → publish_layout. Overlaps auto-pack. autoSize sizes from message length.",
           "Acasă post-its: tasks via upsert_task/delete_task, groceries via shopping_add/shopping_check/shopping_delete, messages via upsert_message/delete_message.",
           "Call get_view_design (or get_schema.design) before editing a view. Stay inside constraints — no free-form HTML.",
           "Custom pages: upsert_page / delete_page. Antena 3 live: start_antena3_live / stop_antena3_live only when Alex asks — never default rotation.",
@@ -730,7 +790,8 @@ async function upsertCard(store: AgentStore, args: unknown, now: Date, fetchImag
   if (!views.some((view) => view.id === viewId)) return no("that view does not exist");
   const cards = await store.cards();
   const existing = cards.find((card) => card.externalId === value.externalId) ?? null;
-  const locked = handLock(existing, "card");
+  const layoutOnly = isVisionLayoutOnlyUpdate(value, existing);
+  const locked = visionCardLock(existing, layoutOnly);
   if (locked) return no(locked);
   let data: Record<string, unknown> = value.data ? { ...value.data } : existing ? { ...existing.data } : {};
   if (value.kind === "countdown" && typeof data.target === "string") {
@@ -756,6 +817,19 @@ async function upsertCard(store: AgentStore, args: unknown, now: Date, fetchImag
     return no(`Victorii allows at most ${VISION_DESIGN.maxCards} cards`);
   }
 
+  const title = value.title === undefined ? (existing?.title ?? null) : value.title || null;
+  const body = value.body === undefined ? (existing?.body ?? null) : value.body || null;
+  const wins =
+    value.kind === "wins" && Array.isArray(data.items)
+      ? data.items.flatMap((item) => {
+          if (!item || typeof item !== "object") return [];
+          const text = (item as { text?: unknown }).text;
+          return typeof text === "string" ? [text] : [];
+        })
+      : [];
+  const suggested = suggestVisionPresentation({ kind: value.kind, title, body, wins });
+  const autoSize = value.autoSize ?? (!value.grid && value.fontScale === undefined);
+
   let grid = {
     col: existing?.gridCol ?? 0,
     row: existing?.gridRow ?? 0,
@@ -766,40 +840,71 @@ async function upsertCard(store: AgentStore, args: unknown, now: Date, fetchImag
     const clamped = clampVisionGrid({
       col: value.grid.col,
       row: value.grid.row,
-      colSpan: value.grid.colSpan ?? grid.colSpan,
-      rowSpan: value.grid.rowSpan ?? grid.rowSpan,
+      colSpan: value.grid.colSpan ?? (autoSize ? suggested.colSpan : grid.colSpan),
+      rowSpan: value.grid.rowSpan ?? (autoSize ? suggested.rowSpan : grid.rowSpan),
     });
     if (!clamped) return no("grid must fit the 4×3 Victorii board (spans max 2)");
     grid = clamped;
-  } else if (!existing) {
-    const spot = place(cards, viewId);
-    grid = { col: spot.col, row: spot.row, colSpan: 1, rowSpan: 1 };
+  } else if (!existing || autoSize) {
+    const spot = place(cards, viewId, existing?.id ?? null);
+    grid = {
+      col: spot.col,
+      row: spot.row,
+      colSpan: autoSize ? suggested.colSpan : 1,
+      rowSpan: autoSize ? suggested.rowSpan : 1,
+    };
+    const clamped = clampVisionGrid(grid);
+    if (clamped) grid = clamped;
   }
   if (occupied(cards, viewId, grid.col, grid.row, existing?.id ?? null, grid.colSpan, grid.rowSpan)) {
-    warnings.push("the board cell overlaps another card");
+    const packed = packVisionCards([
+      ...liveVision.map((card) => ({
+        id: card.id,
+        col: card.gridCol,
+        row: card.gridRow,
+        colSpan: card.gridColSpan,
+        rowSpan: card.gridRowSpan,
+      })),
+      {
+        id: existing?.id ?? "new",
+        col: grid.col,
+        row: grid.row,
+        colSpan: grid.colSpan,
+        rowSpan: grid.rowSpan,
+      },
+    ]);
+    const self = packed.find((card) => card.id === (existing?.id ?? "new"));
+    if (self) {
+      grid = { col: self.col, row: self.row, colSpan: self.colSpan, rowSpan: self.rowSpan };
+      warnings.push("moved into a free cell to avoid overlap");
+    }
   }
 
   const tilt = value.tilt ?? existing?.tilt ?? 0;
   const fontScale: FontScale = value.fontScale
     ? value.fontScale
-    : parseFontScale(data.fontScale, existing ? parseFontScale(existing.data.fontScale) : "md");
+    : autoSize
+      ? suggested.fontScale
+      : parseFontScale(data.fontScale, existing ? parseFontScale(existing.data.fontScale) : "md");
   data = { ...data, fontScale };
+  if (value.hidden !== undefined) data.hidden = value.hidden;
 
   const expiresAt = instantField(value.expiresAt, existing?.expiresAt ?? null);
   if (expiresAt === "bad") return no("expiresAt must be a date and time");
+  const keepManual = Boolean(existing && layoutOnly && (existing.locked || existing.source !== "assistant"));
   const draft = {
     id: existing?.id ?? crypto.randomUUID(),
     viewId,
     kind: value.kind,
-    title: value.title === undefined ? (existing?.title ?? null) : value.title || null,
-    body: value.body === undefined ? (existing?.body ?? null) : value.body || null,
+    title,
+    body,
     color: value.color ?? existing?.color ?? KIND_COLOR[value.kind],
     tilt,
     grid,
     expiresAt: expiresAt ?? undefined,
     pinned: existing?.pinned ?? false,
-    source: "assistant" as const,
-    locked: false,
+    source: (keepManual ? existing!.source : "assistant") as Source,
+    locked: keepManual ? Boolean(existing!.locked) : false,
     externalId: value.externalId,
     data,
   };
@@ -824,8 +929,8 @@ async function upsertCard(store: AgentStore, args: unknown, now: Date, fetchImag
     gridRowSpan: card.grid.rowSpan,
     expiresAt: card.expiresAt ?? null,
     pinned: card.pinned,
-    source: "assistant",
-    locked: false,
+    source: card.source,
+    locked: card.locked,
     externalId: card.externalId ?? value.externalId,
     data: card.data as Record<string, unknown>,
     deletedAt: null,
@@ -842,10 +947,190 @@ async function deleteCard(store: AgentStore, args: unknown, now: Date): Promise<
   const existing = cards.find((card) => card.id === input.value.id || card.externalId === input.value.externalId) ?? null;
   if (!existing) return no("that card was not found");
   if (existing.deletedAt) return done(success(existing.id, ["already removed"]), null);
-  const locked = handLock(existing, "card");
+  const locked = visionCardLock(existing, false);
   if (locked) return no(locked);
   await store.putCard({ ...existing, deletedAt: now.toISOString() });
   return done(success(existing.id), { cards: [copy(existing)] });
+}
+
+async function previewLayout(store: AgentStore, args: unknown, now: Date): Promise<Outcome> {
+  const input = read(previewLayoutInput, args);
+  if (!input.ok) return input.outcome;
+  const cards = active(await store.cards()).filter((card) => card.viewId === "vision");
+  const includeHidden = input.value.includeHidden === true;
+  const overrides = new Map((input.value.cards ?? []).map((card) => [card.externalId, card]));
+  const base = cards
+    .filter((card) => includeHidden || card.data.hidden !== true || overrides.has(card.externalId ?? ""))
+    .map((card) => {
+      const externalId = card.externalId ?? card.id;
+      const override = overrides.get(externalId);
+      const title = override?.title !== undefined ? override.title ?? null : card.title;
+      const body = override?.body !== undefined ? override.body ?? null : card.body;
+      const kind = override?.kind ?? card.kind;
+      const suggested = suggestVisionPresentation({ kind, title, body });
+      const colSpan = override?.grid?.colSpan ?? (override?.grid ? card.gridColSpan : suggested.colSpan);
+      const rowSpan = override?.grid?.rowSpan ?? (override?.grid ? card.gridRowSpan : suggested.rowSpan);
+      const grid = override?.grid
+        ? clampVisionGrid({
+            col: override.grid.col,
+            row: override.grid.row,
+            colSpan,
+            rowSpan,
+          })
+        : { col: card.gridCol, row: card.gridRow, colSpan: card.gridColSpan, rowSpan: card.gridRowSpan };
+      if (!grid) return null;
+      return {
+        id: card.id,
+        externalId,
+        kind,
+        title,
+        body,
+        color: override?.color ?? card.color,
+        tilt: override?.tilt ?? card.tilt,
+        fontScale: override?.fontScale ?? (override ? suggested.fontScale : parseFontScale(card.data.fontScale)),
+        hidden: override?.hidden ?? card.data.hidden === true,
+        col: grid.col,
+        row: grid.row,
+        colSpan: grid.colSpan,
+        rowSpan: grid.rowSpan,
+      };
+    })
+    .filter((card): card is NonNullable<typeof card> => Boolean(card));
+
+  for (const [externalId, override] of overrides) {
+    if (base.some((card) => card.externalId === externalId)) continue;
+    const suggested = suggestVisionPresentation({
+      kind: override.kind ?? "note",
+      title: override.title ?? null,
+      body: override.body ?? null,
+    });
+    const grid = override.grid
+      ? clampVisionGrid({
+          col: override.grid.col,
+          row: override.grid.row,
+          colSpan: override.grid.colSpan ?? suggested.colSpan,
+          rowSpan: override.grid.rowSpan ?? suggested.rowSpan,
+        })
+      : { col: 0, row: 0, colSpan: suggested.colSpan, rowSpan: suggested.rowSpan };
+    if (!grid) continue;
+    base.push({
+      id: `draft-${externalId}`,
+      externalId,
+      kind: override.kind ?? "note",
+      title: override.title ?? null,
+      body: override.body ?? null,
+      color: override.color ?? "sand",
+      tilt: override.tilt ?? 0,
+      fontScale: override.fontScale ?? suggested.fontScale,
+      hidden: override.hidden ?? false,
+      col: grid.col,
+      row: grid.row,
+      colSpan: grid.colSpan,
+      rowSpan: grid.rowSpan,
+    });
+  }
+
+  const visible = base.filter((card) => includeHidden || !card.hidden);
+  const packed = packVisionCards(visible);
+  const draft: VisionLayoutDraft = {
+    secret: crypto.randomUUID().replace(/-/g, ""),
+    updatedAt: now.toISOString(),
+    cards: packed.map(
+      (card): VisionLayoutPlacement => ({
+        externalId: card.externalId,
+        grid: { col: card.col, row: card.row, colSpan: card.colSpan, rowSpan: card.rowSpan },
+        fontScale: card.fontScale,
+        hidden: card.hidden,
+        tilt: card.tilt,
+        title: card.title,
+        body: card.body,
+        kind: card.kind,
+        color: card.color,
+      }),
+    ),
+  };
+  await store.putVisionDraft(draft);
+  const origin = publicOrigin();
+  const previewUrl = `${origin}/api/preview/vision/${draft.secret}.png`;
+  return {
+    result: success(draft.secret, [], {
+      previewUrl,
+      draft: {
+        updatedAt: draft.updatedAt,
+        canvas: { width: 1280, height: 720, letterboxFor: "1920×1080 Cast" },
+        cards: draft.cards,
+      },
+    }),
+    undo: null,
+  };
+}
+
+async function publishLayout(store: AgentStore, now: Date): Promise<Outcome> {
+  const draft = parseVisionDraft(await store.visionDraft());
+  if (!draft || draft.cards.length === 0) return no("no layout draft — call preview_layout first");
+  const cards = await store.cards();
+  const previous = cards
+    .filter((card) => draft.cards.some((item) => item.externalId === card.externalId))
+    .map((card) => copy(card));
+  const warnings: string[] = [];
+  for (const item of draft.cards) {
+    const existing = cards.find((card) => card.externalId === item.externalId) ?? null;
+    if (!existing || existing.deletedAt) {
+      warnings.push(`missing card ${item.externalId}`);
+      continue;
+    }
+    const locked = visionCardLock(existing, true);
+    if (locked) {
+      warnings.push(locked);
+      continue;
+    }
+    const data = { ...existing.data };
+    if (item.fontScale) data.fontScale = item.fontScale;
+    if (item.hidden !== undefined) data.hidden = item.hidden;
+    await store.putCard({
+      ...existing,
+      gridCol: item.grid.col,
+      gridRow: item.grid.row,
+      gridColSpan: item.grid.colSpan,
+      gridRowSpan: item.grid.rowSpan,
+      tilt: item.tilt ?? existing.tilt,
+      data,
+    });
+  }
+  await store.putVisionDraft(null);
+  return done(success(draft.secret, warnings), previous.length > 0 ? { cards: previous } : null);
+}
+
+function publicOrigin(): string {
+  const raw = process.env.NEXT_PUBLIC_APP_URL?.trim() || process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
+  if (raw) return raw.startsWith("http") ? raw.replace(/\/$/, "") : `https://${raw.replace(/\/$/, "")}`;
+  return "https://tv-dashboard-sigma-one.vercel.app";
+}
+
+function visionCardLock(row: { source: Source; locked?: boolean } | null, layoutOnly: boolean): string | null {
+  if (!row) return null;
+  if (row.source === "integration") return "card comes from an integration and cannot be changed here";
+  if (layoutOnly) return null;
+  if (row.locked || row.source !== "assistant") return "card is locked by a manual edit";
+  return null;
+}
+
+function isVisionLayoutOnlyUpdate(
+  value: z.infer<typeof cardInput>,
+  existing: CardRecord | null,
+): boolean {
+  if (!existing) return false;
+  if (value.kind !== existing.kind) return false;
+  if (value.title !== undefined && (value.title || null) !== existing.title) return false;
+  if (value.body !== undefined && (value.body || null) !== existing.body) return false;
+  if (value.color !== undefined && value.color !== existing.color) return false;
+  if (value.image_url) return false;
+  if (value.expiresAt !== undefined) return false;
+  if (value.data) {
+    const keys = Object.keys(value.data).filter((key) => key !== "fontScale" && key !== "hidden");
+    if (keys.length > 0) return false;
+  }
+  return true;
 }
 
 async function upsertSpotlight(store: AgentStore, args: unknown): Promise<Outcome> {
@@ -1620,9 +1905,9 @@ function sameControl(left: DisplayControl, right: DisplayControl): boolean {
   return left.mode === right.mode && left.viewId === right.viewId && left.pinnedUntil === right.pinnedUntil && left.dimmed === right.dimmed;
 }
 
-function place(cards: CardRecord[], viewId: string): { col: number; row: number } {
+function place(cards: CardRecord[], viewId: string, exceptId: string | null = null): { col: number; row: number } {
   const taken = new Set<string>();
-  for (const card of active(cards).filter((row) => row.viewId === viewId)) {
+  for (const card of active(cards).filter((row) => row.viewId === viewId && row.id !== exceptId)) {
     for (let row = card.gridRow; row < card.gridRow + card.gridRowSpan && row < VISION_DESIGN.grid.rows; row += 1) {
       for (let col = card.gridCol; col < card.gridCol + card.gridColSpan && col < VISION_DESIGN.grid.columns; col += 1) {
         taken.add(`${col},${row}`);

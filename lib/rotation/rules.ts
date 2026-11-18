@@ -57,7 +57,10 @@ export function evaluateRules(input: {
   } else if (rules.priorityBanner && priority) {
     notices.push({ id: "priorityBanner", reason: priority.reason });
   }
-  for (const title of birthdays) celebrations.push({ view: "vision", text: celebrationDay(title) });
+  for (const title of birthdays) {
+    const text = celebrationDay(title);
+    if (text) celebrations.push({ view: "vision", text });
+  }
   for (const item of celebrations) notices.push({ id: "celebrations", reason: item.text });
   if (alert) notices.push({ id: "weatherAlert", reason: alert });
 
