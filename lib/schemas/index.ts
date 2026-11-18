@@ -7,6 +7,7 @@ export const paletteTokenSchema = z.enum(["sand", "coral", "lilac", "mint", "sky
 const evidenceSchema = z.string().trim().min(1).max(200);
 
 const fontScaleSchema = z.enum(["sm", "md", "lg"]).optional();
+const hiddenSchema = z.boolean().optional();
 
 const gridSchema = z.object({
   col: z.number().int().nonnegative(),
@@ -38,12 +39,13 @@ export const cardSchema = z.discriminatedUnion("kind", [
       storagePath: z.string().min(1).optional(),
       alt: z.string().max(200).optional(),
       fontScale: fontScaleSchema,
+      hidden: hiddenSchema,
     }),
   }),
   z.object({
     ...cardBase,
     kind: z.literal("affirmation"),
-    data: z.object({ text: z.string().max(500).optional(), fontScale: fontScaleSchema }),
+    data: z.object({ text: z.string().max(500).optional(), fontScale: fontScaleSchema, hidden: hiddenSchema }),
   }),
   z.object({
     ...cardBase,
@@ -52,12 +54,13 @@ export const cardSchema = z.discriminatedUnion("kind", [
       target: z.string().datetime({ offset: true }),
       label: z.string().max(200).optional(),
       fontScale: fontScaleSchema,
+      hidden: hiddenSchema,
     }),
   }),
   z.object({
     ...cardBase,
     kind: z.literal("word"),
-    data: z.object({ word: z.string().trim().min(1).max(80), fontScale: fontScaleSchema }),
+    data: z.object({ word: z.string().trim().min(1).max(80), fontScale: fontScaleSchema, hidden: hiddenSchema }),
   }),
   z.object({
     ...cardBase,
@@ -69,6 +72,7 @@ export const cardSchema = z.discriminatedUnion("kind", [
       style: z.enum(["ring", "bar"]),
       evidence: evidenceSchema,
       fontScale: fontScaleSchema,
+      hidden: hiddenSchema,
     }),
   }),
   z.object({
@@ -84,17 +88,18 @@ export const cardSchema = z.discriminatedUnion("kind", [
         )
         .max(8),
       fontScale: fontScaleSchema,
+      hidden: hiddenSchema,
     }),
   }),
   z.object({
     ...cardBase,
     kind: z.literal("recap"),
-    data: z.object({ recapId: z.string().uuid().optional(), fontScale: fontScaleSchema }),
+    data: z.object({ recapId: z.string().uuid().optional(), fontScale: fontScaleSchema, hidden: hiddenSchema }),
   }),
   z.object({
     ...cardBase,
     kind: z.literal("note"),
-    data: z.object({ text: z.string().max(500).optional(), fontScale: fontScaleSchema }),
+    data: z.object({ text: z.string().max(500).optional(), fontScale: fontScaleSchema, hidden: hiddenSchema }),
   }),
 ]);
 

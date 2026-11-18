@@ -1081,6 +1081,21 @@
   height: 100%;
 }
 
+.vision-card.affirmation .card-fill {
+  justify-content: center;
+  gap: 12px;
+}
+
+.vision-card.affirmation .script {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  width: 100%;
+  min-height: 0;
+}
+
 .vision-card .card-hero {
   flex: 1 1 auto;
   display: flex;
@@ -1099,9 +1114,31 @@
 }
 
 .vision-card .card-body {
-  flex: 0 1 auto;
+  flex: 0 0 auto;
   margin: 0;
   min-height: 0;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.vision-card.countdown .card-fill,
+.vision-card.note .card-fill {
+  justify-content: flex-start;
+  gap: 6px;
+}
+
+.vision-card.countdown .card-hero {
+  flex: 0 1 auto;
+}
+
+.vision-card.countdown .card-body,
+.vision-card.note .card-body {
+  flex: 1 1 auto;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
   overflow: hidden;
 }
 

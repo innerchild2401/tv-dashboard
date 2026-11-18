@@ -253,7 +253,15 @@ A run calls `get_view_design` (or `get_schema`) first, then `get_dashboard_state
 
 Call `get_view_design` with an optional `viewId` (`today` | `week` | `momente` | `vision` | `home` | `custom-page` | `antena3`) before editing a screen. It returns hard constraints and allowed knobs. `get_schema` embeds the same payload under `schema.design`, plus `schema.pages` and `schema.live`. Stay inside those limits — no free-form HTML. Auth is still `Authorization: Bearer AGENT_TOKEN` on `/mcp` and `POST /api/agent/<tool>`.
 
-Victorii (view id `vision`) is a data-driven 4×3 board (max 12 cards). Every card kind should carry a readable `title` and `body` (affirmations use the scripture reference as `title`, e.g. `Efeseni 5:22`; wins use a hero title like `Bravo, Zian!`). On `upsert_card` pass layout knobs: `grid` `{col,row,colSpan?,rowSpan?}` (spans max 2), `tilt` (−3…3), `fontScale` (`sm`|`md`|`lg`). Photos always use the polaroid frame. Call `upsert_card` with `kind: "photo"` and an HTTPS `image_url` (jpeg/png/webp/gif, max 5 MB). The server downloads the image into the private photos bucket and stores `data.storagePath`. Non-images and oversized files are refused. Prefer `https://`. Phone remote camera/gallery uploads still write the same `storagePath` field. Example:
+Victorii (view id `vision`) is a data-driven 4×3 board (max 12 cards) on the **1280×720** Cast design canvas (uniform letterbox into a living-room **1920×1080** LG / DashCast viewport — ×1.35 inside the 10% overscan-safe area; ×1.5 on a bare 1080p panel). Every card kind should carry a readable `title` and `body` (affirmations use the scripture reference as `title`, e.g. `Efeseni 5:22`; wins use a hero title like `Bravo, Zian!`).
+
+**Packing:** live TV always packs cards into free cells with **no overlaps**. Cards without a free preferred cell (or with bad defaults) are relocated. Prefer saving a non-overlapping MCP grid (e.g. quote `(0,0) 2×2`, Zian `(2,1) 1×1`).
+
+**Full control:** Panou Familie may rearrange, resize, or `hidden:true` **all** Victorii cards (samples and system cards such as Rezumat / Pachetul). Omit `grid`/`fontScale` (or pass `autoSize: true`) to pick span + font from message length so short wins feel large and long quotes stay legible. Bare calendar titles like `Aniversare` do **not** show an empty celebration card — only named anniversaries do.
+
+**Preview → publish:** `preview_layout` writes a draft and returns a PNG URL at 1280×720 (`/api/preview/vision/<secret>.png`). Review it, then `publish_layout` applies grid/fontScale/hidden/tilt atomically and clears the draft.
+
+On `upsert_card` pass layout knobs: `grid` `{col,row,colSpan?,rowSpan?}` (spans max 2), `tilt` (−3…3), `fontScale` (`sm`|`md`|`lg`), `hidden`. Photos always use the polaroid frame. Call `upsert_card` with `kind: "photo"` and an HTTPS `image_url` (jpeg/png/webp/gif, max 5 MB). The server downloads the image into the private photos bucket and stores `data.storagePath`. Non-images and oversized files are refused. Prefer `https://`. Phone remote camera/gallery uploads still write the same `storagePath` field. Example:
 
 ```json
 {
@@ -306,4 +314,6 @@ Hard rules from pychromecast `DashCastController` / AlexxIT DashCast:
 
 After pulling a new `pi-agent`, restart `tv-agent`. Heartbeat `version` should read `2` or newer on `/remote/system`. No token values belong in git.
 
-A manual or locked row is left unchanged. A priority needs a one-line reason and expires at the end of the day in Europe/Bucharest unless another time is sent. A manual priority wins. `route_inbox_item` creates an event only when the text has a date and a time. Otherwise it creates a task, or leaves the item as needs review when the destination is unclear. A win or progress card needs `evidence` such as `task:done:<id>`. `undo` restores one of the last 50 assistant writes, and it refuses when a later manual edit is holding that row. `/remote/system` lists those writes and can undo one.
+Victorii layout/hide updates are allowed on sample and system cards; integration-sourced rows stay refused. A priority needs a one-line reason and expires at the end of the day in Europe/Bucharest unless another time is sent. A manual priority wins. `route_inbox_item` creates an event only when the text has a date and a time. Otherwise it creates a task, or leaves the item as needs review when the destination is unclear. A win or progress card needs `evidence` such as `task:done:<id>`. `undo` restores one of the last 50 assistant writes, and it refuses when a later manual edit is holding that row. `/remote/system` lists those writes and can undo one.
+
+After deploying, reconnect Panou Familie / Grokbot so `/mcp` tools/list refreshes. Confirm these tools appear: `upsert_page`, `delete_page`, `start_antena3_live`, `stop_antena3_live`, `preview_layout`, `publish_layout`.

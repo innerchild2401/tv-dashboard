@@ -43,6 +43,7 @@ type Bag = {
   control: DisplayControl;
   views: ViewRow[];
   pages: PageRow[];
+  visionDraft: unknown | null;
 };
 
 export class MemoryStore implements AgentStore {
@@ -63,6 +64,7 @@ export class MemoryStore implements AgentStore {
     control: { ...ROTATE_CONTROL },
     views: sampleConfig.views.map((view) => ({ ...view })),
     pages: [],
+    visionDraft: null,
   };
 
   async countRecent(now: Date): Promise<number> {
@@ -159,6 +161,14 @@ export class MemoryStore implements AgentStore {
   async putPagesAndViews(input: { pages: PageRow[]; views: ViewRow[] }): Promise<void> {
     this.bag.pages = copy(input.pages);
     this.bag.views = copy(input.views);
+  }
+
+  async visionDraft(): Promise<unknown | null> {
+    return copy(this.bag.visionDraft);
+  }
+
+  async putVisionDraft(draft: unknown | null): Promise<void> {
+    this.bag.visionDraft = draft == null ? null : copy(draft);
   }
 
   async cards(): Promise<CardRecord[]> {

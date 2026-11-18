@@ -158,6 +158,20 @@ export class SupabaseStore implements AgentStore {
     if (error) throw new Error("db");
   }
 
+  async visionDraft(): Promise<unknown | null> {
+    const { data, error } = await this.db.from("config").select("vision_draft").eq("id", 1).maybeSingle();
+    if (error) throw new Error("db");
+    return (data as { vision_draft?: unknown } | null)?.vision_draft ?? null;
+  }
+
+  async putVisionDraft(draft: unknown | null): Promise<void> {
+    const { error } = await this.db
+      .from("config")
+      .update({ vision_draft: draft as Json | null })
+      .eq("id", 1);
+    if (error) throw new Error("db");
+  }
+
   async cards(): Promise<CardRecord[]> {
     const { data, error } = await this.db.from("cards").select("*");
     if (error || !data) throw new Error("db");

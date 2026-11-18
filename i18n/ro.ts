@@ -327,11 +327,12 @@ export function prioritySoon(minutes: number): string {
   return `${ro.priorityIn} ${minutes} min`;
 }
 
-export function celebrationDay(title: string): string {
+/** Real anniversary copy for Victorii. Returns null when the calendar title has no person/name left. */
+export function celebrationDay(title: string): string | null {
   const trimmed = title.trim();
-  if (!trimmed || /^aniversare$/i.test(trimmed)) return ro.celebrationDay;
+  if (!trimmed || /^aniversare$/i.test(trimmed)) return null;
   const stripped = trimmed.replace(/^(zi(?:ua)?\s+de\s+na[sș]tere|aniversare)\s*[:\-]?\s*/i, "").trim();
-  if (!stripped) return ro.celebrationDay;
+  if (!stripped || /^aniversare$/i.test(stripped)) return null;
   return `${ro.celebrationDay}: ${stripped}`;
 }
 
