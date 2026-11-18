@@ -112,7 +112,7 @@ export const LIVE_DESIGN = {
   knobs: ["minutes"] as const,
   rules: [
     "MUST NOT be in the default rotation. Start only when Alex asks via MCP.",
-    "start_antena3_live pins fullscreen Antena 3 in-page (soft switch — no DashCast relaunch).",
+    "start_antena3_live pins fullscreen Antena 3 in-page only (no cast_hls / Default Media Receiver).",
     "Playback uses the free HLS master only (hls.js when MSE exists; native HLS when MSE missing). No VAST/IMA iframe — ads block Cast. Never show video controls.",
     "Starts muted for autoplay policy, then unmutes for sound on Cast (CrKey). On-screen diag shows buildId + host + err.",
     "If the stream never starts (~12s) the TV abandons the pin and returns to rotation. stop_antena3_live must leave Antena 3 within seconds.",

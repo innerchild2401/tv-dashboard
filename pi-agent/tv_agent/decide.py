@@ -7,8 +7,9 @@ from urllib.parse import parse_qsl, urlsplit
 
 IDLE_APP_ID = "E8C28D3C"
 DASH_APP_ID = "84912283"
+MEDIA_APP_ID = "CC1AD845"  # Default Media Receiver (cast_hls)
 # Bump when cast-matching / no-flash rules change so /remote/system shows the Pi got the update.
-AGENT_VERSION = "3"
+AGENT_VERSION = "4"
 
 
 @dataclass(frozen=True)
@@ -58,6 +59,8 @@ class Step:
     receiver: str
     cast: bool
     play_hls: bool = False
+    # True for explicit cast_now: quit foreign apps (esp. DMR) and retry DashCast.
+    cast_recover: bool = False
     heartbeat: bool = False
     restart: bool = False
     notes: list[str] = field(default_factory=list)
@@ -85,7 +88,11 @@ def classify(sight: Sight, expected_url: str, last_cast_url: str | None) -> str:
     """Classify the receiver. Prefer app_id over media "off" — DashCast can look idle while still showing."""
     app_id = (sight.app_id or "").upper()
     name = (sight.app_name or "").casefold()
-    if app_id in ("", IDLE_APP_ID) or name in {"backdrop", "default media receiver"}:
+    # Default Media Receiver is not idle: leaving it classified as idle + hands_off
+    # after a failed cast_hls blocked auto DashCast recovery for up to 60 minutes.
+    if app_id == MEDIA_APP_ID or name == "default media receiver":
+        return "other"
+    if app_id in ("", IDLE_APP_ID) or name == "backdrop":
         if "backdrop" in name:
             return "backdrop"
         return "idle"
@@ -150,6 +157,10 @@ def plan(
             _reset_idle(memory)
             notes.append("cast_hls")
 
+    # Panel recovery wins: never play HLS in the same cycle as cast_now.
+    if forced:
+        play_hls = False
+
     if not sight.looked:
         _freeze_idle(memory, now)
     elif not sight.found:
@@ -185,10 +196,12 @@ def plan(
         ):
             auto = True
             notes.append("refresh")
+    cast = (forced and sight.found) or auto
     return Step(
         receiver=receiver,
-        cast=(forced and sight.found) or auto,
-        play_hls=play_hls and sight.found,
+        cast=cast,
+        play_hls=play_hls and sight.found and not cast,
+        cast_recover=forced and sight.found,
         heartbeat=now - memory.last_heartbeat >= settings.heartbeat_seconds,
         restart=restart,
         notes=notes,

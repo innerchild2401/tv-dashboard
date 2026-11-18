@@ -23,13 +23,19 @@ URL = "https://tv.example/tv?token=secret"
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def tick(memory, now, sight, commands, casts, beats, settings=None, hls=None):
+def tick(memory, now, sight, commands, casts, beats, settings=None, hls=None, recovers=None):
     settings = settings or Settings()
     looked = should_look(memory, now, commands)
     seen = sight if looked else Sight(looked=False, found=False)
 
     def cast():
         casts.append(now)
+
+    def cast_recover():
+        if recovers is not None:
+            recovers.append(now)
+        else:
+            casts.append(now)
 
     def play_hls():
         if hls is not None:
@@ -48,6 +54,7 @@ def tick(memory, now, sight, commands, casts, beats, settings=None, hls=None):
                 commands=commands,
                 sight=seen,
                 cast=cast,
+                cast_recover=cast_recover if recovers is not None else None,
                 play_hls=play_hls if hls is not None else None,
                 heartbeat=heartbeat,
                 wall_iso="2026-11-08T10:00:00+00:00",
@@ -153,8 +160,10 @@ class WatchdogTest(unittest.TestCase):
     def test_cast_now_overrides_netflix_and_release_blocks_the_automatic_cast(self):
         netflix = Sight(looked=True, found=True, app_id="CA5E8412", app_name="Netflix")
         casts = []
-        tick(Memory(), 0, netflix, [Command("1", "cast_now")], casts, [])
-        self.assertEqual(casts, [0])
+        recovers = []
+        tick(Memory(), 0, netflix, [Command("1", "cast_now")], casts, [], recovers=recovers)
+        self.assertEqual(casts, [])
+        self.assertEqual(recovers, [0])
 
         backdrop = Sight(looked=True, found=True, app_id=IDLE_APP_ID, app_name="Backdrop")
         memory = Memory()
@@ -220,10 +229,32 @@ class WatchdogTest(unittest.TestCase):
         self.assertEqual(casts, [])
         self.assertEqual(hls, [0])
         self.assertGreater(memory.hands_off_until, 0)
-        # While hands-off, idle DMR must not auto DashCast over the live stream.
-        idle = Sight(looked=True, found=True, app_id=IDLE_APP_ID, app_name="Default Media Receiver")
-        tick(memory, 30, idle, [], casts, beats, hls=hls)
+        # While hands-off, DMR (classified as other) must not auto DashCast over the live stream.
+        dmr = Sight(looked=True, found=True, app_id="CC1AD845", app_name="Default Media Receiver")
+        tick(memory, 30, dmr, [], casts, beats, hls=hls)
         self.assertEqual(casts, [])
+
+    def test_cast_now_beats_cast_hls_and_recovers_from_dmr(self):
+        dmr = Sight(looked=True, found=True, app_id="CC1AD845", app_name="Default Media Receiver")
+        casts = []
+        recovers = []
+        hls = []
+        memory = Memory()
+        memory.hands_off_until = 999
+        tick(
+            memory,
+            0,
+            dmr,
+            [Command("1", "cast_hls", 15), Command("2", "cast_now")],
+            casts,
+            [],
+            hls=hls,
+            recovers=recovers,
+        )
+        self.assertEqual(hls, [])
+        self.assertEqual(casts, [])
+        self.assertEqual(recovers, [0])
+        self.assertEqual(memory.hands_off_until, 0)
 
     def test_example_config_uses_the_spec_intervals(self):
         example = (ROOT / "tv-agent.toml.example").read_text(encoding="utf-8")
