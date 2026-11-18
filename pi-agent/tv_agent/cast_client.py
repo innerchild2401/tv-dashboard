@@ -124,10 +124,33 @@ def _wait_media_active(cast, timeout: float) -> bool:
             status = None
         state = (getattr(status, "player_state", None) or "").upper()
         content = getattr(status, "content_id", None) or getattr(status, "content_type", None)
+        current = getattr(status, "current_time", None)
         if state in _ACTIVE_MEDIA_STATES and content:
+            log.info("cast_hls: MediaController %s t=%s", state, current)
             return True
         time.sleep(0.4)
     return False
+
+
+def log_media_status(config: Config) -> str | None:
+    """Peek Default Media Receiver state for journal proof of sustained PLAYING."""
+    cast, browser = _connect(config)
+    try:
+        if cast is None:
+            return None
+        cast.wait(timeout=float(config.discovery_timeout_seconds))
+        app_id = (getattr(cast, "app_id", None) or "").upper()
+        if app_id != "CC1AD845":
+            log.info("cast_hls: media peek app=%s (not DMR)", app_id or "none")
+            return app_id or None
+        status = cast.media_controller.status
+        state = (getattr(status, "player_state", None) or "").upper() or "UNKNOWN"
+        current = getattr(status, "current_time", None)
+        content = getattr(status, "content_id", None) or getattr(status, "content_type", None)
+        log.info("cast_hls: MediaController %s t=%s content=%s", state, current, bool(content))
+        return state
+    finally:
+        _close(cast, browser)
 
 
 def _relaunch_dashcast(cast, config: Config) -> None:

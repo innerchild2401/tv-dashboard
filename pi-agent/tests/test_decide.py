@@ -234,25 +234,46 @@ class WatchdogTest(unittest.TestCase):
         tick(memory, 30, dmr, [], casts, beats, hls=hls)
         self.assertEqual(casts, [])
 
-    def test_cast_hls_hands_off_clears_when_stream_dies_to_backdrop(self):
+    def test_cast_hls_holds_through_backdrop_until_pin_expiry(self):
         dash = Sight(looked=True, found=True, app_id=DASH_APP_ID, app_name="DashCast", dash_url=URL)
         media = Sight(looked=True, found=True, app_id="CC1AD845", app_name="Default Media Receiver")
         backdrop = Sight(looked=True, found=True, app_id=IDLE_APP_ID, app_name="Backdrop")
         memory = Memory()
         casts: list[float] = []
+        recovers: list[float] = []
         hls: list[float] = []
         beats: list[object] = []
-        tick(memory, 0, dash, [Command("1", "cast_hls", 60)], casts, beats, hls=hls)
+        tick(memory, 0, dash, [Command("1", "cast_hls", 60)], casts, beats, hls=hls, recovers=recovers)
         self.assertEqual(hls, [0])
         self.assertGreater(memory.hands_off_until, 0)
-        tick(memory, 15, media, [], casts, beats)
+        tick(memory, 15, media, [], casts, beats, recovers=recovers)
         self.assertEqual(casts, [])
-        self.assertGreater(memory.hands_off_until, 0)
-        # Stream dies → Backdrop under a long hands-off window; clear so idle_seconds can recover.
-        for now in (30, 45, 60, 75, 90):
-            tick(memory, now, backdrop, [], casts, beats)
-        self.assertEqual(memory.hands_off_until, 0)
-        self.assertEqual(casts, [90])
+        self.assertEqual(recovers, [])
+        # Mid-play Backdrop must NOT clear the pin or steal Cast (HH-35 / v6 regression).
+        for now in (30, 45, 60, 75, 90, 120, 180, 600, 1200):
+            tick(memory, now, backdrop, [], casts, beats, recovers=recovers)
+        self.assertEqual(casts, [])
+        self.assertEqual(recovers, [])
+        self.assertTrue(memory.media_hands_off)
+        self.assertGreater(memory.hands_off_until, 1200)
+        # After 60 min pin expiry, recover DashCast even from Backdrop.
+        tick(memory, 60 * 60, backdrop, [], casts, beats, recovers=recovers)
+        self.assertEqual(recovers, [60 * 60])
+        self.assertFalse(memory.media_hands_off)
+
+    def test_cast_hls_pin_expiry_recovers_dmr(self):
+        dash = Sight(looked=True, found=True, app_id=DASH_APP_ID, app_name="DashCast", dash_url=URL)
+        dmr = Sight(looked=True, found=True, app_id="CC1AD845", app_name="Default Media Receiver")
+        memory = Memory()
+        recovers: list[float] = []
+        hls: list[float] = []
+        tick(memory, 0, dash, [Command("1", "cast_hls", 1)], [], [], hls=hls, recovers=recovers)
+        self.assertEqual(hls, [0])
+        tick(memory, 30, dmr, [], [], [], recovers=recovers)
+        self.assertEqual(recovers, [])
+        tick(memory, 60, dmr, [], [], [], recovers=recovers)
+        self.assertEqual(recovers, [60])
+        self.assertFalse(memory.media_hands_off)
 
     def test_cast_hls_failure_restores_dashcast_without_hands_off(self):
         showing = Sight(looked=True, found=True, app_id=DASH_APP_ID, app_name="DashCast", dash_url=URL)
