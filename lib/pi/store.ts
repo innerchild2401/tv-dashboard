@@ -180,7 +180,10 @@ async function appendDbLog(lines: LogLine[]): Promise<void> {
 }
 
 function commandFrom(row: { id: string; kind: string; minutes: number | null }): QueuedCommand {
-  const kind: CommandKind = row.kind === "cast_now" || row.kind === "restart_service" ? row.kind : "release";
+  const kind: CommandKind =
+    row.kind === "cast_now" || row.kind === "restart_service" || row.kind === "cast_hls"
+      ? row.kind
+      : "release";
   return { id: row.id, kind, minutes: row.minutes };
 }
 

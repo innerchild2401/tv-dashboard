@@ -3,6 +3,8 @@
 export const LIVE_PLAY_START_MS = 12_000;
 export const LIVE_PLAY_RETRY_MS = [0, 400, 900, 1600, 2800] as const;
 export const LIVE_UNMUTE_RETRY_MS = [0, 500, 1200, 2500, 5000] as const;
+/** Never block Cast forever waiting for the hls.js chunk. */
+export const HLS_IMPORT_TIMEOUT_MS = 2_500;
 
 export type LiveProbe = {
   ok: boolean;
@@ -17,6 +19,12 @@ export type CastUaInfo = {
   castLike: boolean;
   crKey: boolean;
   label: string;
+  shortUa: string;
+};
+
+export type LiveCapabilities = {
+  mse: boolean;
+  nativeHls: boolean;
 };
 
 /** HEAD/GET the free HLS master — used by MCP start and unit tests. */
@@ -62,7 +70,33 @@ export function detectCastUa(ua: string = typeof navigator !== "undefined" ? nav
   else if (/Chromecast/i.test(ua)) label = "Chromecast";
   else if (/DashCast/i.test(ua)) label = "DashCast";
   else if (castLike) label = "CastTV";
-  return { castLike, crKey, label };
+  const compact = ua ? ua.replace(/\s+/g, " ") : "";
+  const token = compact.match(/CrKey\/[\w.]+|Chromecast|DashCast|SmartTV|Web0S|Tizen/i)?.[0];
+  const shortUa = !compact
+    ? "no-ua"
+    : compact.length <= 56
+      ? compact
+      : token
+        ? `${compact.slice(0, 36)}…${token}`
+        : compact.slice(0, 56);
+  return { castLike, crKey, label, shortUa };
+}
+
+/** Sync MSE / native HLS probes — never wait on hls.js for these. */
+export function detectLiveCapabilities(
+  video?: Pick<HTMLVideoElement, "canPlayType"> | null,
+): LiveCapabilities {
+  const mse =
+    typeof MediaSource !== "undefined" &&
+    typeof MediaSource.isTypeSupported === "function" &&
+    (MediaSource.isTypeSupported('video/mp4; codecs="avc1.42E01E,mp4a.40.2"') ||
+      MediaSource.isTypeSupported('video/mp4; codecs="avc1.77.30,mp4a.40.2"'));
+  const nativeHls = Boolean(
+    video &&
+      (video.canPlayType("application/vnd.apple.mpegurl") !== "" ||
+        video.canPlayType("application/x-mpegURL") !== ""),
+  );
+  return { mse, nativeHls };
 }
 
 /**
@@ -72,6 +106,14 @@ export function detectCastUa(ua: string = typeof navigator !== "undefined" ? nav
  */
 export function preferLiveEngine(mseSupported: boolean, _ua: CastUaInfo): LiveEngine {
   return mseSupported ? "hlsjs" : "native";
+}
+
+export function streamHost(url: string): string {
+  try {
+    return new URL(url).host || "no-host";
+  } catch {
+    return "bad-url";
+  }
 }
 
 export function prepareVideoElement(video: HTMLVideoElement, muted: boolean): void {
@@ -165,4 +207,52 @@ export async function ensureAudible(
 
 export function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+type HlsModule = {
+  default: {
+    isSupported: () => boolean;
+    Events: { ERROR: string; MANIFEST_PARSED: string };
+    new (config?: Record<string, unknown>): {
+      destroy: () => void;
+      loadSource: (url: string) => void;
+      attachMedia: (video: HTMLVideoElement) => void;
+      on: (event: string, handler: (...args: never[]) => void) => void;
+    };
+  };
+};
+
+/**
+ * Load hls.js with a hard timeout. A hung Cast chunk fetch must not freeze engine=none forever.
+ */
+export async function loadHlsModule(
+  timeoutMs: number = HLS_IMPORT_TIMEOUT_MS,
+  importImpl: () => Promise<HlsModule> = () => import("hls.js") as Promise<HlsModule>,
+): Promise<HlsModule["default"] | null> {
+  try {
+    const mod = await Promise.race([
+      importImpl(),
+      sleep(timeoutMs).then(() => null),
+    ]);
+    if (!mod || !mod.default) return null;
+    return mod.default;
+  } catch {
+    return null;
+  }
+}
+
+export function videoErrorLabel(video: HTMLVideoElement): string {
+  const err = video.error;
+  if (!err) return "";
+  const code =
+    err.code === 1
+      ? "aborted"
+      : err.code === 2
+        ? "network"
+        : err.code === 3
+          ? "decode"
+          : err.code === 4
+            ? "src"
+            : `e${err.code}`;
+  return code;
 }

@@ -23,13 +23,17 @@ URL = "https://tv.example/tv?token=secret"
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def tick(memory, now, sight, commands, casts, beats, settings=None):
+def tick(memory, now, sight, commands, casts, beats, settings=None, hls=None):
     settings = settings or Settings()
     looked = should_look(memory, now, commands)
     seen = sight if looked else Sight(looked=False, found=False)
 
     def cast():
         casts.append(now)
+
+    def play_hls():
+        if hls is not None:
+            hls.append(now)
 
     def heartbeat(payload):
         beats.append(payload)
@@ -44,6 +48,7 @@ def tick(memory, now, sight, commands, casts, beats, settings=None):
                 commands=commands,
                 sight=seen,
                 cast=cast,
+                play_hls=play_hls if hls is not None else None,
                 heartbeat=heartbeat,
                 wall_iso="2026-11-08T10:00:00+00:00",
                 uptime_seconds=int(now),
@@ -203,6 +208,22 @@ class WatchdogTest(unittest.TestCase):
         self.assertFalse(should_look(memory, now - 1, []))
         self.assertTrue(should_look(memory, now, []))
         self.assertTrue(should_look(memory, 0, [Command("1", "cast_now")]))
+        self.assertTrue(should_look(memory, 0, [Command("2", "cast_hls", 15)]))
+
+    def test_cast_hls_plays_media_and_hands_off(self):
+        showing = Sight(looked=True, found=True, app_id=DASH_APP_ID, app_name="DashCast", dash_url=URL)
+        casts = []
+        hls = []
+        beats = []
+        memory = Memory()
+        tick(memory, 0, showing, [Command("1", "cast_hls", 15)], casts, beats, hls=hls)
+        self.assertEqual(casts, [])
+        self.assertEqual(hls, [0])
+        self.assertGreater(memory.hands_off_until, 0)
+        # While hands-off, idle DMR must not auto DashCast over the live stream.
+        idle = Sight(looked=True, found=True, app_id=IDLE_APP_ID, app_name="Default Media Receiver")
+        tick(memory, 30, idle, [], casts, beats, hls=hls)
+        self.assertEqual(casts, [])
 
     def test_example_config_uses_the_spec_intervals(self):
         example = (ROOT / "tv-agent.toml.example").read_text(encoding="utf-8")

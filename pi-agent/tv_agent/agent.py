@@ -8,7 +8,7 @@ import sys
 import time
 from datetime import datetime, timezone
 
-from tv_agent.cast_client import load, observe
+from tv_agent.cast_client import load, observe, play_hls
 from tv_agent.config import Config, read_config
 from tv_agent.decide import AGENT_VERSION, Command, Memory, Sight, should_look
 from tv_agent.http_client import request_json, scrub
@@ -69,6 +69,9 @@ def cycle(config: Config, memory: Memory, started: float) -> None:
     def do_cast() -> None:
         load(config)
 
+    def do_play_hls() -> None:
+        play_hls(config)
+
     def do_heartbeat(payload: dict[str, object]) -> None:
         request_json("POST", f"{config.server_url.rstrip('/')}/api/pi/heartbeat", config.pi_token, payload)
 
@@ -81,6 +84,7 @@ def cycle(config: Config, memory: Memory, started: float) -> None:
             commands=commands,
             sight=sight,
             cast=do_cast,
+            play_hls=do_play_hls,
             heartbeat=do_heartbeat,
             wall_iso=datetime.now(timezone.utc).isoformat(),
             uptime_seconds=max(0, int(now - started)),
@@ -100,7 +104,7 @@ def fetch_commands(config: Config) -> list[Command]:
         if not isinstance(item, dict):
             continue
         kind = item.get("kind")
-        if kind not in {"cast_now", "release", "restart_service"}:
+        if kind not in {"cast_now", "release", "restart_service", "cast_hls"}:
             continue
         minutes = item.get("minutes")
         found.append(Command(id=str(item.get("id") or ""), kind=str(kind), minutes=minutes if isinstance(minutes, int) else None))

@@ -299,11 +299,11 @@ Acasă (view id `home`) is a post-it board of tasks, grocery items, and family m
 
 ### Antena 3 live (on demand only)
 
-`start_antena3_live` / `stop_antena3_live` are **not** part of the default rotation. Start only when Alex asks. The TV soft-pins an in-page fullscreen player on the free HLS master (`hls.js` when MSE exists; native HLS when MSE is missing). Autoplay starts muted for Cast policy, then unmutes for **sound**. No `<video controls>`. An on-screen diagnostic shows `buildId` + player state for photos. The official `antena3.ro/live` page is **not** iframed — it wraps VAST/IMA pre-roll that Cast cannot click through. Optional `minutes` (default 60, max 180) auto-returns to rotation. `stop_antena3_live` returns immediately.
+`start_antena3_live` / `stop_antena3_live` are **not** part of the default rotation. Start only when Alex asks. The TV soft-pins an in-page fullscreen player on the free HLS master (`hls.js` when MSE exists, with a hard import timeout; native HLS when MSE is missing). Autoplay starts muted for Cast policy, then unmutes for **sound**. No `<video controls>`. On-screen diag shows `buildId`, engine, stream host, UA, and concrete `err`. If the stream never starts (~12s) — or `stop_antena3_live` clears the pin — the TV **must** leave Antena 3 and resume rotation within seconds (fast poll + `/api/tv/live/abandon`). The official `antena3.ro/live` page is **not** iframed — it wraps VAST/IMA pre-roll that Cast cannot click through. Optional `minutes` (default 60, max 180) auto-returns to rotation.
 
 **Cast JS cache:** `/api/state` includes `buildId` (Vercel commit). The TV soft-reloads when that changes — no Pi recast for ordinary deploys. First boot after a long-lived Cast session may still wait for DashCast `reload_seconds` (or a one-shot `tv-agent` restart) until the new client is loaded once.
 
-**Pi / DashCast:** keep `dashcast_force = false`. Do **not** call `load_url` for live start/stop — the dashboard switches in-page via `/api/state` + Realtime. Chromium `--autoplay-policy` on the Pi does **not** apply (DashCast runs on the Chromecast receiver, not Pi Chromium). After pulling `pi-agent`, restart `tv-agent` only if the watchdog binary changed; live itself needs no Pi change for playback.
+**Pi / DashCast / HLS:** keep `dashcast_force = false`. `start_antena3_live` also queues Pi `cast_hls` (Default Media Receiver plays the free HLS master **with sound**). `stop_antena3_live` queues `cast_now` to restore DashCast. Requires `tv-agent` **version ≥ 3** on the Pi (`scp` `pi-agent`, then `sudo systemctl restart tv-agent`). Heartbeat `version` on `/remote/system` should show `3`. In-page playback remains as a fallback; the TV abandons a stuck pin after ~12s.
 
 ### Chromecast / Pi notes (flicker)
 
@@ -314,7 +314,7 @@ Hard rules from pychromecast `DashCastController` / AlexxIT DashCast:
 - **`dashcast_reload_seconds = 1800`** (or 300–540 if Cast idle-timeouts are aggressive) with `force=false` for soft page reload. Leave `dashboard_refresh_seconds = 0` — that path is a Pi re-cast for `force=true` only.
 - Stuck views are a client/rotation bug — fix soft advance, do not “un-stick” with DashCast relaunch.
 
-After pulling a new `pi-agent`, restart `tv-agent`. Heartbeat `version` should read `2` or newer on `/remote/system`. No token values belong in git.
+After pulling a new `pi-agent`, restart `tv-agent`. Heartbeat `version` should read `3` or newer on `/remote/system`. No token values belong in git.
 
 Victorii layout/hide updates are allowed on sample and system cards; integration-sourced rows stay refused. A priority needs a one-line reason and expires at the end of the day in Europe/Bucharest unless another time is sent. A manual priority wins. `route_inbox_item` creates an event only when the text has a date and a time. Otherwise it creates a task, or leaves the item as needs review when the destination is unclear. A win or progress card needs `evidence` such as `task:done:<id>`. `undo` restores one of the last 50 assistant writes, and it refuses when a later manual edit is holding that row. `/remote/system` lists those writes and can undo one.
 

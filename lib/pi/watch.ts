@@ -8,7 +8,7 @@ export const LOG_LIMIT = 80;
 export const RECEIVERS = ["idle", "backdrop", "dashboard", "other", "unknown"] as const;
 export type Receiver = (typeof RECEIVERS)[number];
 
-export const COMMANDS = ["cast_now", "release", "restart_service"] as const;
+export const COMMANDS = ["cast_now", "release", "restart_service", "cast_hls"] as const;
 export type CommandKind = (typeof COMMANDS)[number];
 
 const READS = new Set(["get_dashboard_state", "get_schema", "get_view_design", "get_inbox", "undo"]);
@@ -80,11 +80,26 @@ export function parseHeartbeat(body: unknown): HeartbeatInput | null {
 export function parseCommand(body: unknown): { kind: CommandKind; minutes: number | null } | null {
   if (!body || typeof body !== "object") return null;
   const record = body as { command?: unknown; minutes?: unknown };
-  if (record.command !== "cast_now" && record.command !== "release" && record.command !== "restart_service") return null;
-  if (record.command === "release") {
+  if (
+    record.command !== "cast_now" &&
+    record.command !== "release" &&
+    record.command !== "restart_service" &&
+    record.command !== "cast_hls"
+  ) {
+    return null;
+  }
+  if (record.command === "release" || record.command === "cast_hls") {
     const minutes = typeof record.minutes === "number" ? record.minutes : Number(record.minutes);
-    if (!Number.isInteger(minutes) || minutes < 1 || minutes > 240) return null;
-    return { kind: "release", minutes };
+    if (record.command === "release") {
+      if (!Number.isInteger(minutes) || minutes < 1 || minutes > 240) return null;
+      return { kind: "release", minutes };
+    }
+    // cast_hls minutes optional (default handled by Pi / start_antena3_live).
+    if (record.minutes === undefined || record.minutes === null || record.minutes === "") {
+      return { kind: "cast_hls", minutes: null };
+    }
+    if (!Number.isInteger(minutes) || minutes < 1 || minutes > 180) return null;
+    return { kind: "cast_hls", minutes };
   }
   return { kind: record.command, minutes: null };
 }
@@ -141,6 +156,7 @@ export function receiverLabel(receiver: Receiver): string {
 export function commandLabel(kind: CommandKind, minutes: number | null): string {
   if (kind === "cast_now") return ro.remote.commandCast;
   if (kind === "restart_service") return ro.remote.commandRestart;
+  if (kind === "cast_hls") return minutes ? `Antena 3 HLS ${minutes} min` : "Antena 3 HLS";
   return `${ro.remote.commandRelease} ${minutes ?? 30} min`;
 }
 

@@ -46,6 +46,30 @@ def load(config: Config) -> None:
         _close(cast, browser)
 
 
+# Free Antena 3 HLS master (same URL as the dashboard). No secrets.
+ANTENA3_HLS_URL = "https://live3vox.antenaplay.ro/a3free/a3free.m3u8"
+
+
+def play_hls(config: Config, url: str = ANTENA3_HLS_URL) -> None:
+    """Leave DashCast and play HLS on the Default Media Receiver (sound works)."""
+    cast, browser = _connect(config)
+    try:
+        if cast is None:
+            raise RuntimeError("chromecast not found")
+        cast.wait(timeout=config.discovery_timeout_seconds)
+        # application/x-mpegURL is what Chromecast DMR expects for HLS live.
+        cast.media_controller.play_media(
+            url,
+            "application/x-mpegURL",
+            stream_type="LIVE",
+            autoplay=True,
+            title="Antena 3",
+        )
+        cast.media_controller.block_until_active(timeout=float(config.discovery_timeout_seconds))
+    finally:
+        _close(cast, browser)
+
+
 def _connect(config: Config):
     import pychromecast
 

@@ -8,7 +8,7 @@ from urllib.parse import parse_qsl, urlsplit
 IDLE_APP_ID = "E8C28D3C"
 DASH_APP_ID = "84912283"
 # Bump when cast-matching / no-flash rules change so /remote/system shows the Pi got the update.
-AGENT_VERSION = "2"
+AGENT_VERSION = "3"
 
 
 @dataclass(frozen=True)
@@ -57,8 +57,9 @@ class Memory:
 class Step:
     receiver: str
     cast: bool
-    heartbeat: bool
-    restart: bool
+    play_hls: bool = False
+    heartbeat: bool = False
+    restart: bool = False
     notes: list[str] = field(default_factory=list)
 
 
@@ -101,7 +102,7 @@ def classify(sight: Sight, expected_url: str, last_cast_url: str | None) -> str:
 
 
 def should_look(memory: Memory, now: float, commands: list[Command]) -> bool:
-    if any(command.kind == "cast_now" for command in commands):
+    if any(command.kind in {"cast_now", "cast_hls"} for command in commands):
         return True
     return now >= memory.backoff_until
 
@@ -127,6 +128,7 @@ def plan(
 ) -> Step:
     notes: list[str] = []
     forced = False
+    play_hls = False
     restart = False
     for command in commands:
         if command.kind == "restart_service":
@@ -141,6 +143,12 @@ def plan(
             forced = True
             memory.hands_off_until = 0.0
             notes.append("cast_now")
+        elif command.kind == "cast_hls":
+            play_hls = True
+            minutes = command.minutes if command.minutes and 1 <= command.minutes <= 180 else 60
+            memory.hands_off_until = now + minutes * 60
+            _reset_idle(memory)
+            notes.append("cast_hls")
 
     if not sight.looked:
         _freeze_idle(memory, now)
@@ -180,6 +188,7 @@ def plan(
     return Step(
         receiver=receiver,
         cast=(forced and sight.found) or auto,
+        play_hls=play_hls and sight.found,
         heartbeat=now - memory.last_heartbeat >= settings.heartbeat_seconds,
         restart=restart,
         notes=notes,

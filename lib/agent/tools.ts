@@ -49,6 +49,7 @@ import { ROTATE_CONTROL, type DisplayControl } from "@/lib/remote/hold";
 import { packVisionCards } from "@/lib/views/pack";
 import { ANTENA3_STREAM_URL } from "@/lib/live/antena3";
 import { probeHlsUrl } from "@/lib/live/playback";
+import { queueCommand } from "@/lib/pi/store";
 
 const READS = new Set<ToolName>([
   "get_dashboard_state",
@@ -1620,14 +1621,18 @@ async function startAntena3Live(store: AgentStore, args: unknown, now: Date): Pr
   };
   await store.putControl(next);
   const warnings = [
-    "soft in-page pin — keep dashcast_force=false on the Pi",
+    "soft in-page pin + Pi cast_hls (Default Media Receiver) when tv-agent ≥3",
+    "keep dashcast_force=false on the Pi",
     "TV soft-reloads when /api/state buildId changes (Cast JS cache)",
-    "playback unmutes after start for sound — check on-screen diag SUNET",
+    "if stream stalls ~12s the TV abandons the pin and returns to rotation",
   ];
   const probe = await probeHlsUrl(ANTENA3_STREAM_URL);
   if (!probe.ok || !probe.looksLikeHls) {
     warnings.push("HLS master was not reachable from the server — TV may show the stuck fallback");
   }
+  const queued = await queueCommand("cast_hls", minutes, now);
+  if (!queued.ok) warnings.push("Pi cast_hls was not queued — in-page player only until tv-agent updated");
+  else warnings.push("queued cast_hls for Pi Default Media Receiver (sound)");
   return done(success(LIVE_VIEW_ID, warnings), {
     control: current,
     expectControl: next,
@@ -1642,7 +1647,11 @@ async function stopAntena3Live(store: AgentStore, now: Date): Promise<Outcome> {
   }
   const next: DisplayControl = { ...ROTATE_CONTROL, dimmed: current.dimmed };
   await store.putControl(next);
-  return done(success("rotate"), { control: current, expectControl: next });
+  const warnings: string[] = [];
+  const queued = await queueCommand("cast_now", null, now);
+  if (!queued.ok) warnings.push("Pi cast_now was not queued — DashCast may still show media until recast");
+  else warnings.push("queued cast_now to restore DashCast dashboard");
+  return done(success("rotate", warnings), { control: current, expectControl: next });
 }
 
 async function pinView(store: AgentStore, args: unknown, now: Date): Promise<Outcome> {

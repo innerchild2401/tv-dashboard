@@ -114,9 +114,9 @@ export const LIVE_DESIGN = {
     "MUST NOT be in the default rotation. Start only when Alex asks via MCP.",
     "start_antena3_live pins fullscreen Antena 3 in-page (soft switch — no DashCast relaunch).",
     "Playback uses the free HLS master only (hls.js when MSE exists; native HLS when MSE missing). No VAST/IMA iframe — ads block Cast. Never show video controls.",
-    "Starts muted for autoplay policy, then unmutes for sound on Cast (CrKey). On-screen diag shows buildId + player state.",
-    "stop_antena3_live returns to the normal dashboard rotation.",
-    "Pi: keep dashcast_force=false; do not load_url for this switch. TV soft-reloads when /api/state buildId changes.",
+    "Starts muted for autoplay policy, then unmutes for sound on Cast (CrKey). On-screen diag shows buildId + host + err.",
+    "If the stream never starts (~12s) the TV abandons the pin and returns to rotation. stop_antena3_live must leave Antena 3 within seconds.",
+    "Pi: keep dashcast_force=false. TV soft-reloads when /api/state buildId changes.",
   ],
 };
 

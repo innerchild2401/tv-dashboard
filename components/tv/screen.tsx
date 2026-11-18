@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { HomeView } from "@/components/views/home-view";
 import { LiveView } from "@/components/views/live-view";
 import { MomenteView } from "@/components/views/momente-view";
@@ -11,6 +11,13 @@ import { WeekView } from "@/components/views/week-view";
 import { LIVE_VIEW_ID, ro } from "@/i18n/ro";
 import type { TvState } from "@/lib/state/types";
 import { tvFitScale } from "@/lib/tv/fit";
+import {
+  LIVE_EXIT_POLL_MS,
+  isLiveOverlay,
+  liveAbandonPath,
+  serverLeftLive,
+  shouldAbandonStuckLive,
+} from "@/lib/tv/live-exit";
 import {
   NIGHTLY_RELOAD_KEY,
   nightlyReloadKey,
@@ -39,13 +46,59 @@ export function TvScreen({
   const [state, setState] = useState(initial);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [live, setLive] = useState(false);
+  const [livePlaying, setLivePlaying] = useState(false);
   const refetchRef = useRef<(opts?: { rotate?: boolean }) => void>(() => {});
   const rootRef = useRef<HTMLElement | null>(null);
   const stateRef = useRef(state);
   const rotatingRef = useRef(false);
   const loadedBuildIdRef = useRef(initial.buildId || "");
   const reloadingRef = useRef(false);
+  const liveStartedAtRef = useRef<number | null>(isLiveOverlay(initial) ? Date.now() : null);
+  const abandoningRef = useRef(false);
   stateRef.current = state;
+
+  const applyIncoming = useCallback((current: TvState, body: unknown): boolean => {
+    const next = nextTvState(current, body);
+    // Always leave a stale Antena 3 overlay when the server says rotation is back.
+    if (isLiveOverlay(current) && serverLeftLive(next)) {
+      liveStartedAtRef.current = null;
+      setLivePlaying(false);
+      setState(next);
+      return true;
+    }
+    setState(next);
+    if (isLiveOverlay(next) && !isLiveOverlay(current)) {
+      liveStartedAtRef.current = Date.now();
+      setLivePlaying(false);
+    }
+    if (!isLiveOverlay(next)) {
+      liveStartedAtRef.current = null;
+      setLivePlaying(false);
+    }
+    return true;
+  }, []);
+
+  const abandonLive = useCallback(
+    async (_reason: string) => {
+      if (abandoningRef.current) return;
+      abandoningRef.current = true;
+      try {
+        const headers = new Headers({ "Content-Type": "application/json" });
+        if (token) headers.set("Authorization", `Bearer ${token}`);
+        await fetch(liveAbandonPath(), { method: "POST", headers, cache: "no-store" }).catch(() => null);
+        const pullHeaders = new Headers();
+        if (token) pullHeaders.set("Authorization", `Bearer ${token}`);
+        const response = await fetch(tvStatePath(), { headers: pullHeaders, cache: "no-store" });
+        if (response.ok) {
+          const body: unknown = await response.json();
+          applyIncoming(stateRef.current, body);
+        }
+      } finally {
+        abandoningRef.current = false;
+      }
+    },
+    [token, applyIncoming],
+  );
 
   useEffect(() => {
     const maybeReloadForBuild = (body: unknown) => {
@@ -68,8 +121,12 @@ export function TvScreen({
         const body: unknown = await response.json();
         if (maybeReloadForBuild(body)) return;
         const next = nextTvState(current, body);
-        if (next.currentView !== current.currentView || next.until !== current.until) {
-          setState(next);
+        if (
+          next.currentView !== current.currentView ||
+          next.until !== current.until ||
+          (isLiveOverlay(current) && serverLeftLive(next))
+        ) {
+          applyIncoming(current, body);
         }
       } catch {
         // Still stuck — classic tv-tick may full-nav; Pi ignores ?view= so no splash.
@@ -102,12 +159,13 @@ export function TvScreen({
         if (
           opts?.rotate &&
           next.currentView === current.currentView &&
-          next.until === current.until
+          next.until === current.until &&
+          !(isLiveOverlay(current) && serverLeftLive(next))
         ) {
           await softFallback(current, headers);
           return;
         }
-        setState(next);
+        applyIncoming(current, body);
       } catch {
         // Leave the last good frame up; poll / dwell / tv-tick will retry.
       } finally {
@@ -118,7 +176,7 @@ export function TvScreen({
     refetchRef.current = (opts) => {
       void pull(opts);
     };
-  }, [token]);
+  }, [token, applyIncoming]);
 
   useEffect(() => {
     const fit = () => {
@@ -142,9 +200,11 @@ export function TvScreen({
   }, []);
 
   useEffect(() => {
-    const stop = scheduleEvery(() => refetchRef.current(), TV_POLL_MS);
+    // While Antena 3 is up, poll faster so stop_antena3_live / pin_view apply in ~1–2s.
+    const ms = isLiveOverlay(state) ? LIVE_EXIT_POLL_MS : TV_POLL_MS;
+    const stop = scheduleEvery(() => refetchRef.current(), ms);
     return stop;
-  }, []);
+  }, [state.currentView, state.hold, state.live]);
 
   useEffect(() => {
     if (state.hold === "paused" || state.hold === "locked") return;
@@ -223,9 +283,26 @@ export function TvScreen({
     };
   }, [realtime]);
 
+  // Wall-clock abandon: Cast often throttles setTimeout inside the player effect.
+  useEffect(() => {
+    if (!isLiveOverlay(state)) return;
+    if (
+      shouldAbandonStuckLive({
+        onLive: true,
+        playing: livePlaying,
+        startedAtMs: liveStartedAtRef.current ?? nowMs,
+        nowMs,
+      })
+    ) {
+      void abandonLive("wallclock-12s");
+    }
+  }, [state, livePlaying, nowMs, abandonLive]);
+
   const shown = withLiveClock(state, nowMs, live);
   const holdFixed = shown.hold === "paused" || shown.hold === "locked";
   const dwellLabel = shown.hold === "paused" ? ro.paused : shown.hold === "locked" ? ro.lockedView : `${shown.dwellRemaining}s`;
+  const showLive = shown.currentView === LIVE_VIEW_ID && shown.live != null;
+
   return (
     <main
       ref={rootRef}
@@ -241,8 +318,15 @@ export function TvScreen({
     >
       <div className="tv-slot">
         <div className="tv-stage">
-          {shown.currentView === LIVE_VIEW_ID && shown.live ? (
-            <LiveView view={shown.live} buildId={shown.buildId} />
+          {showLive ? (
+            <LiveView
+              view={shown.live!}
+              buildId={shown.buildId}
+              onPlayingChange={setLivePlaying}
+              onStuck={(reason) => {
+                void abandonLive(reason);
+              }}
+            />
           ) : (
             <Chrome chrome={shown.chrome} dwellLabel={dwellLabel} holdFixed={holdFixed}>
               <ViewBody state={shown} />
