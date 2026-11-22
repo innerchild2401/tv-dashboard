@@ -1,5 +1,5 @@
 import type { TvState } from "@/lib/state/types";
-import { LIVE_VIEW_ID, type ViewId } from "@/i18n/ro";
+import { isLiveOverlayId, type ViewId } from "@/i18n/ro";
 import { formatClock, formatDuration } from "@/lib/time/bucharest";
 
 /** Phone remote / nightly checks. */
@@ -52,7 +52,7 @@ export function readIncomingBuildId(incoming: unknown): string | null {
 
 export function parseViewId(value: string | null | undefined): ViewId | null {
   if (!value || !VIEW_ID_RE.test(value)) return null;
-  if (value === LIVE_VIEW_ID) return LIVE_VIEW_ID;
+  if (isLiveOverlayId(value)) return value;
   return value;
 }
 

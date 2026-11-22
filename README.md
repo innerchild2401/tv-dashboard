@@ -251,7 +251,7 @@ A run calls `get_view_design` (or `get_schema`) first, then `get_dashboard_state
 
 ### Design tools (Grokbot / Panou Familie)
 
-Call `get_view_design` with an optional `viewId` (`today` | `week` | `momente` | `vision` | `home` | `custom-page` | `antena3`) before editing a screen. It returns hard constraints and allowed knobs. `get_schema` embeds the same payload under `schema.design`, plus `schema.pages` and `schema.live`. Stay inside those limits — no free-form HTML. Auth is still `Authorization: Bearer AGENT_TOKEN` on `/mcp` and `POST /api/agent/<tool>`.
+Call `get_view_design` with an optional `viewId` (`today` | `week` | `momente` | `vision` | `home` | `custom-page` | `antena3`) before editing a screen. It returns hard constraints and allowed knobs. `get_schema` embeds the same payload under `schema.design`, plus `schema.pages` and `schema.live` (channels + tools). Stay inside those limits — no free-form HTML. Auth is still `Authorization: Bearer AGENT_TOKEN` on `/mcp` and `POST /api/agent/<tool>`.
 
 Victorii (view id `vision`) is a data-driven 4×3 board (max 12 cards) on the **1280×720** Cast design canvas (uniform letterbox into a living-room **1920×1080** LG / DashCast viewport — ×1.35 inside the 10% overscan-safe area; ×1.5 on a bare 1080p panel). Every card kind should carry a readable `title` and `body` (affirmations use the scripture reference as `title`, e.g. `Efeseni 5:22`; wins use a hero title like `Bravo, Zian!`).
 
@@ -285,7 +285,7 @@ Acasă (view id `home`) is a post-it board of tasks, grocery items, and family m
 
 ### Custom pages (rotation)
 
-`upsert_page` / `delete_page` add full-screen Romanian pages (title + body only) into Cast rotation. Ids are lowercase slugs (`reguli-familie`). Reserved: `today`, `week`, `momente`, `vision`, `home`, `antena3`. Pass `enabled: true` to rotate the page; `enabled: false` keeps the content but skips it. `get_view_design({ viewId: "custom-page" })` returns the contract. Example:
+`upsert_page` / `delete_page` add full-screen Romanian pages (title + body only) into Cast rotation. Ids are lowercase slugs (`reguli-familie`). Reserved: `today`, `week`, `momente`, `vision`, `home`, `antena3`, `kanal-d`, `digi24`, `realitatea-plus`. Pass `enabled: true` to rotate the page; `enabled: false` keeps the content but skips it. `get_view_design({ viewId: "custom-page" })` returns the contract. Example:
 
 ```json
 {
@@ -297,15 +297,28 @@ Acasă (view id `home`) is a post-it board of tasks, grocery items, and family m
 }
 ```
 
-### Antena 3 live (on demand only)
+### Live TV channels (on demand only)
 
-`start_antena3_live` / `stop_antena3_live` are **not** part of the default rotation. Start only when Alex asks. The TV soft-pins an in-page fullscreen player on the free HLS master (`hls.js` when MSE exists, with a hard import timeout; native HLS when MSE is missing). Autoplay starts muted for Cast policy, then unmutes for **sound**. No `<video controls>`. On-screen diag shows `buildId`, engine, stream host, UA, and concrete `err`. If the stream never starts (~12s) — or `stop_antena3_live` clears the pin — the TV **must** leave Antena 3 and resume rotation within seconds (fast poll + `/api/tv/live/abandon`). The official `antena3.ro/live` page is **not** iframed — it wraps VAST/IMA pre-roll that Cast cannot click through. Optional `minutes` (default 60, max 180) auto-returns to rotation.
+Prefer `start_live_channel` / `stop_live_channel`. Aliases `start_antena3_live` / `stop_antena3_live` stay for Grokbot compatibility. **Not** part of the default rotation — start only when Alex asks.
+
+| channel | stream | in-page | notes |
+| --- | --- | --- | --- |
+| `antena3` | free HLS master (no VAST/IMA) | yes | Pi ≤8 hardcodes this URL; always queues `cast_hls` |
+| `kanal-d` | `stream1.kanald.ro/.../knd-live.m3u8` | yes (CORS `*`) | needs Pi ≥9 for correct cast URL |
+| `digi24` | `edge-ar.rcs-rds.ro/digi24ar/index.m3u8` | **no** (CORS only digi24.ro) | cast-only; never abandon pin on in-page stall |
+| `realitatea-plus` | `stream.realitatea.net/.../playlist.m3u8` | **no** (CORS only realitatea.net) | cast-only; same as Digi 24 |
+
+Example: `start_live_channel({ "channel": "kanal-d", "minutes": 60 })`. Optional `minutes` (default 60, max 180) auto-returns to rotation.
+
+For in-page-capable channels the TV soft-pins a fullscreen player (`hls.js` when MSE exists; native HLS when MSE is missing). Autoplay starts muted, then unmutes. No `<video controls>`. If that stream never starts (~12s) — or `stop_live_channel` clears the pin — the TV leaves live and resumes rotation (fast poll + `/api/tv/live/abandon`). Cast-only channels show a status message and **must not** abandon or queue `cast_now` on stall — Pi MediaController owns playback.
 
 **Cast JS cache:** `/api/state` includes `buildId` (Vercel commit). The TV soft-reloads when that changes — no Pi recast for ordinary deploys. First boot after a long-lived Cast session may still wait for DashCast `reload_seconds` (or a one-shot `tv-agent` restart) until the new client is loaded once.
 
-**Pi / DashCast / HLS (media switcher):** keep `dashcast_force = false`. `start_antena3_live` soft-pins in-page **and** queues Pi `cast_hls`. tv-agent **v5+** casts via hardened `pychromecast` `MediaController` (native media + volume), verifies `PLAYING`/`BUFFERING`, and on failure **quits the media app and restores DashCast** so Cast is never left dead. Soft in-page pin is the secondary fallback. `stop_antena3_live` always queues `cast_now` (v4+ quit + DashCast retries until app `84912283`). Heartbeat `version` on `/remote/system` should show `5`. The TV abandons a stuck in-page pin after ~12s.
+**Pi / DashCast / HLS (media switcher):** keep `dashcast_force = false`. Start soft-pins **and** queues Pi `cast_hls` (Antena 3 always; other channels only when heartbeat `version` ≥ **9**, else old Pi would cast the Antena 3 URL). tv-agent **v9+** reads `url`/`title` from the command (dashboard enriches from the live pin) and casts via hardened `pychromecast` `MediaController`, verifies `PLAYING`/`BUFFERING`, and on failure **quits the media app and restores DashCast**. `stop_live_channel` always queues `cast_now`. Heartbeat `version` on `/remote/system` should show `9` after the Pi update.
 
 **Why not catt / custom receiver:** `catt` uses the same Default Media Receiver; a custom Cast receiver needs a developer app + hosted page. The safer MediaController path (verify + auto-restore) is what we ship.
+
+**Not shipping yet (Alex will ask):** România TV (Referer + incomplete TLS), B1 TV / Prima News (tokenized Dejacast 403 to CrKey).
 
 ### Chromecast / Pi notes (flicker)
 
@@ -316,8 +329,8 @@ Hard rules from pychromecast `DashCastController` / AlexxIT DashCast:
 - **`dashcast_reload_seconds = 1800`** (or 300–540 if Cast idle-timeouts are aggressive) with `force=false` for soft page reload. Leave `dashboard_refresh_seconds = 0` — that path is a Pi re-cast for `force=true` only.
 - Stuck views are a client/rotation bug — fix soft advance, do not “un-stick” with DashCast relaunch.
 
-After pulling a new `pi-agent`, restart `tv-agent`. Heartbeat `version` should read `5` or newer on `/remote/system`. No token values belong in git.
+After pulling a new `pi-agent`, restart `tv-agent` **only when no live channel is mid-cast** (updating mid-Antena 3 would interrupt). Heartbeat `version` should read `9` or newer on `/remote/system` for multi-channel HLS URLs. No token values belong in git.
 
 Victorii layout/hide updates are allowed on sample and system cards; integration-sourced rows stay refused. A priority needs a one-line reason and expires at the end of the day in Europe/Bucharest unless another time is sent. A manual priority wins. `route_inbox_item` creates an event only when the text has a date and a time. Otherwise it creates a task, or leaves the item as needs review when the destination is unclear. A win or progress card needs `evidence` such as `task:done:<id>`. `undo` restores one of the last 50 assistant writes, and it refuses when a later manual edit is holding that row. `/remote/system` lists those writes and can undo one.
 
-After deploying, reconnect Panou Familie / Grokbot so `/mcp` tools/list refreshes. Confirm these tools appear: `upsert_page`, `delete_page`, `start_antena3_live`, `stop_antena3_live`, `preview_layout`, `publish_layout`.
+After deploying, reconnect Panou Familie / Grokbot so `/mcp` tools/list refreshes. Confirm these tools appear: `upsert_page`, `delete_page`, `start_live_channel`, `stop_live_channel`, `start_antena3_live`, `stop_antena3_live`, `preview_layout`, `publish_layout`.

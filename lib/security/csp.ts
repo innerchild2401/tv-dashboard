@@ -4,9 +4,11 @@
 // A nonce in script-src makes modern browsers ignore 'unsafe-inline'.
 // The fallback stays for the older Chromecast webview, which does not.
 
+import { liveMediaCspHosts } from "@/lib/live/channels";
+
 const SUPABASE_HTTPS = "https://*.supabase.co";
 const SUPABASE_WSS = "wss://*.supabase.co";
-const ANTENA_MEDIA = "https://*.antenaplay.ro https://*.antena3.ro https://www.antena3.ro";
+const LIVE_MEDIA = liveMediaCspHosts();
 
 export function isTvDocument(pathname: string): boolean {
   return pathname === "/tv" || pathname.startsWith("/tv/");
@@ -28,14 +30,14 @@ export function contentSecurityPolicy(options: { pathname: string; nonce: string
     "style-src-attr 'unsafe-inline'",
     `img-src 'self' blob: data: ${SUPABASE_HTTPS}`,
     "font-src 'self'",
-    `connect-src 'self' ${SUPABASE_HTTPS} ${SUPABASE_WSS}${tv ? ` ${ANTENA_MEDIA}` : ""}`,
+    `connect-src 'self' ${SUPABASE_HTTPS} ${SUPABASE_WSS}${tv ? ` ${LIVE_MEDIA}` : ""}`,
     "worker-src 'self'",
     "manifest-src 'self'",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
-    tv ? `media-src 'self' blob: ${ANTENA_MEDIA}` : "media-src 'self'",
-    // Antena 3 plays free HLS in-page (media-src). Keep antena hosts for connect/media only.
+    tv ? `media-src 'self' blob: ${LIVE_MEDIA}` : "media-src 'self'",
+    // Live channels play free HLS in-page when CORS allows (media-src). Keep hosts for connect/media only.
     tv ? `frame-src 'self'` : "frame-src 'none'",
   ];
   // /tv must stay embeddable for DashCast iframe (force=false). Explicit allow-all

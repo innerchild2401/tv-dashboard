@@ -1,4 +1,4 @@
-import { LIVE_VIEW_ID, isCoreViewId, type ViewId } from "@/i18n/ro";
+import { LIVE_OVERLAY_IDS, isCoreViewId, type ViewId } from "@/i18n/ro";
 import { STALE_AFTER_MS } from "@/lib/seed/sample-metrics";
 import type { RotationCandidate } from "@/lib/rotation/engine";
 import { addDays, dateKey, zonedParts, type DateParts } from "@/lib/time/bucharest";
@@ -7,7 +7,7 @@ import type { Snapshot, SnapshotMetric } from "@/lib/state/types";
 export function viewCandidates(snapshot: Snapshot, now: Date): RotationCandidate[] {
   const flags = availability(snapshot, now);
   return [...snapshot.config.views]
-    .filter((view) => view.enabled && view.id !== LIVE_VIEW_ID)
+    .filter((view) => view.enabled && !LIVE_OVERLAY_IDS.has(view.id))
     .sort((left, right) => left.order - right.order)
     .map((view) => {
       const id = view.id as ViewId;

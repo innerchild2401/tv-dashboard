@@ -1,5 +1,7 @@
 /** Hard design constraints for TV views (1280×720 Cast canvas). No free-form HTML. */
 
+import { LIVE_CHANNEL_IDS } from "@/lib/live/channels";
+
 export const TV_DESIGN = {
   canvas: { width: 1280, height: 720, letterboxFor: "1920×1080 Cast" },
   fonts: {
@@ -99,7 +101,7 @@ export const PAGE_DESIGN = {
   rules: [
     "Create full-screen Romanian pages via upsert_page (id slug, title, body).",
     "Pass enabled:true to put the page into the Cast rotation; enabled:false keeps content but skips rotation.",
-    "id must be lowercase a-z / digits / dashes, not a reserved core id (today|week|momente|vision|home|antena3).",
+    "id must be lowercase a-z / digits / dashes, not a reserved core or live id (today|week|momente|vision|home|antena3|kanal-d|digi24|realitatea-plus).",
     "delete_page removes the page and drops it from rotation.",
     "No free-form HTML/CSS — title + body only, 1280×720 Cast canvas.",
   ],
@@ -107,17 +109,21 @@ export const PAGE_DESIGN = {
 
 export const LIVE_DESIGN = {
   viewId: "antena3" as const,
-  labelRo: "Antena 3 Live",
-  tools: ["start_antena3_live", "stop_antena3_live"] as const,
-  knobs: ["minutes"] as const,
+  labelRo: "TV Live",
+  tools: ["start_live_channel", "stop_live_channel", "start_antena3_live", "stop_antena3_live"] as const,
+  knobs: ["channel", "minutes"] as const,
+  channels: LIVE_CHANNEL_IDS,
   rules: [
     "MUST NOT be in the default rotation. Start only when Alex asks via MCP.",
-    "start_antena3_live soft-pins in-page (secondary) and queues Pi cast_hls for native Chromecast media + volume (tv-agent ≥5).",
+    "Prefer start_live_channel({ channel, minutes? }). Channels: antena3 | kanal-d | digi24 | realitatea-plus.",
+    "start_antena3_live / stop_antena3_live remain as aliases (Antena 3 start / any live stop).",
+    "Soft-pin in-page (secondary when CORS allows) + Pi cast_hls for native Chromecast media + volume (tv-agent ≥9 for non-Antena URLs).",
     "Pi path: pychromecast MediaController — verify PLAYING/BUFFERING, set audible volume; on failure quit media and restore DashCast (never leave Cast dead).",
-    "Playback uses the free HLS master only (hls.js when MSE exists; native HLS when MSE missing). No VAST/IMA iframe — ads block Cast. Never show video controls.",
-    "In-page starts muted for autoplay policy, then unmutes. On-screen diag shows buildId + host + err.",
-    "If the in-page stream never starts (~12s) the TV abandons the pin. stop_antena3_live clears the pin and queues cast_now (quit media → DashCast retries).",
-    "Pi: keep dashcast_force=false. Heartbeat version should be 5+. TV soft-reloads when /api/state buildId changes.",
+    "digi24 & realitatea-plus are cast-only (CORS blocks in-page hls.js). Never abandon the pin or quit MediaController when the in-page player stalls for those.",
+    "kanal-d allows in-page (CORS *). antena3 uses free HLS master only (no VAST/IMA iframe). Never show video controls.",
+    "In-page (when allowed) starts muted for autoplay policy, then unmutes. On-screen diag shows buildId + host + err.",
+    "If an in-page-capable stream never starts (~12s) the TV abandons the pin. stop_live_channel clears the pin and queues cast_now (quit media → DashCast retries).",
+    "Pi: keep dashcast_force=false. Heartbeat version should be 9+ for multi-channel URLs. TV soft-reloads when /api/state buildId changes.",
   ],
 };
 
@@ -141,7 +147,7 @@ export function viewDesignPayload(viewId?: string | null) {
     "Stay inside the listed constraints — no free-form HTML or CSS.",
     "Auth: Authorization Bearer AGENT_TOKEN on /mcp and POST /api/agent/<tool>.",
     "Romanian UI copy where user-facing.",
-    "Custom pages: upsert_page / delete_page. Antena 3: start_antena3_live / stop_antena3_live (never default rotation).",
+    "Custom pages: upsert_page / delete_page. Live TV: start_live_channel / stop_live_channel (aliases start_antena3_live / stop_antena3_live) — never default rotation.",
     "Victorii rearranges: preview_layout → PNG → publish_layout. upsert_card can hide samples via hidden:true.",
   ];
   if (viewId === "antena3" || viewId === "live") {

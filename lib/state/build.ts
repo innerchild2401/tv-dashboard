@@ -1,5 +1,5 @@
-import { LIVE_VIEW_ID, isCoreViewId, ro, viewLabel, type ViewId } from "@/i18n/ro";
-import { ANTENA3_LIVE } from "@/lib/live/antena3";
+import { isCoreViewId, isLiveOverlayId, ro, viewLabel, type ViewId } from "@/i18n/ro";
+import { liveChannelFromViewId } from "@/lib/live/channels";
 import { activeHold, isOverlayView, ROTATE_CONTROL, type DisplayControl } from "@/lib/remote/hold";
 import { accentColor } from "@/lib/theme/accent";
 import { peekNextView } from "@/lib/rotation/engine";
@@ -124,14 +124,19 @@ export function buildTvState(
     vision: visible === "vision" ? projectVision(snapshot, now, celebrationText(smart.celebrations, "vision")) : null,
     home: visible === "home" ? projectHome(snapshot, now) : null,
     page: customPage ? { id: customPage.id, title: customPage.title, body: customPage.body } : null,
-    live:
-      visible === LIVE_VIEW_ID
-        ? {
-            ...ANTENA3_LIVE,
-            label: ro.liveTv,
-            hint: ro.liveTvHint,
-          }
-        : null,
+    live: (() => {
+      if (!isLiveOverlayId(visible)) return null;
+      const channel = liveChannelFromViewId(visible);
+      if (!channel) return null;
+      return {
+        provider: channel.id,
+        pageUrl: channel.pageUrl,
+        streamUrl: channel.streamUrl,
+        label: channel.label,
+        hint: channel.hint,
+        inPageOk: channel.inPageOk,
+      };
+    })(),
   };
 }
 

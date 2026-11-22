@@ -8,7 +8,8 @@ import { PageView } from "@/components/views/page-view";
 import { TodayView } from "@/components/views/today-view";
 import { VisionView } from "@/components/views/vision-view";
 import { WeekView } from "@/components/views/week-view";
-import { LIVE_VIEW_ID, ro } from "@/i18n/ro";
+import { isLiveOverlayId, ro } from "@/i18n/ro";
+import { isOverlayView } from "@/lib/remote/hold";
 import type { TvState } from "@/lib/state/types";
 import { tvFitScale } from "@/lib/tv/fit";
 import {
@@ -145,7 +146,7 @@ export function TvScreen({
         // for rotation — that churns the Cast URL and (with force=true) relaunches DashCast.
         // Do not force nextView while an overlay pin (Antena 3) is already showing — the
         // server also prefers the pin, but skipping ?view= avoids a needless override race.
-        const overlayPinned = current.currentView === LIVE_VIEW_ID && current.hold === "pinned";
+        const overlayPinned = isOverlayView(current.currentView) && current.hold === "pinned";
         const path =
           opts?.rotate && !overlayPinned ? tvStatePath(current.nextView) : tvStatePath();
         const response = await fetch(path, { headers, cache: "no-store" });
@@ -200,7 +201,7 @@ export function TvScreen({
   }, []);
 
   useEffect(() => {
-    // While Antena 3 is up, poll faster so stop_antena3_live / pin_view apply in ~1–2s.
+    // While live TV is up, poll faster so stop_live_channel / pin_view apply in ~1–2s.
     const ms = isLiveOverlay(state) ? LIVE_EXIT_POLL_MS : TV_POLL_MS;
     const stop = scheduleEvery(() => refetchRef.current(), ms);
     return stop;
@@ -284,6 +285,7 @@ export function TvScreen({
   }, [realtime]);
 
   // Wall-clock abandon: Cast often throttles setTimeout inside the player effect.
+  // Cast-only channels (Digi 24 / Realitatea) must never abandon — Pi owns playback.
   useEffect(() => {
     if (!isLiveOverlay(state)) return;
     if (
@@ -292,6 +294,7 @@ export function TvScreen({
         playing: livePlaying,
         startedAtMs: liveStartedAtRef.current ?? nowMs,
         nowMs,
+        inPageOk: state.live?.inPageOk !== false,
       })
     ) {
       void abandonLive("wallclock-12s");
@@ -301,7 +304,7 @@ export function TvScreen({
   const shown = withLiveClock(state, nowMs, live);
   const holdFixed = shown.hold === "paused" || shown.hold === "locked";
   const dwellLabel = shown.hold === "paused" ? ro.paused : shown.hold === "locked" ? ro.lockedView : `${shown.dwellRemaining}s`;
-  const showLive = shown.currentView === LIVE_VIEW_ID && shown.live != null;
+  const showLive = isLiveOverlayId(shown.currentView) && shown.live != null;
 
   return (
     <main
@@ -324,6 +327,8 @@ export function TvScreen({
               buildId={shown.buildId}
               onPlayingChange={setLivePlaying}
               onStuck={(reason) => {
+                // Never abandon cast-only pins — that would fight the Pi MediaController path.
+                if (shown.live?.inPageOk === false) return;
                 void abandonLive(reason);
               }}
             />

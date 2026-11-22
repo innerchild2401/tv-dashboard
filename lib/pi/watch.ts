@@ -39,7 +39,15 @@ export type PiSnapshot = {
 
 export type LogLine = { at: string; line: string };
 
-export type QueuedCommand = { id: string; kind: CommandKind; minutes: number | null };
+export type QueuedCommand = {
+  id: string;
+  kind: CommandKind;
+  minutes: number | null;
+  /** HLS master URL for cast_hls (Pi ≥9). Omitted for other commands. */
+  url?: string | null;
+  /** Media title for Default Media Receiver (Pi ≥9). */
+  title?: string | null;
+};
 
 export type SystemWrite = {
   id: string;
@@ -156,7 +164,7 @@ export function receiverLabel(receiver: Receiver): string {
 export function commandLabel(kind: CommandKind, minutes: number | null): string {
   if (kind === "cast_now") return ro.remote.commandCast;
   if (kind === "restart_service") return ro.remote.commandRestart;
-  if (kind === "cast_hls") return minutes ? `Antena 3 HLS ${minutes} min` : "Antena 3 HLS";
+  if (kind === "cast_hls") return minutes ? `TV live HLS ${minutes} min` : "TV live HLS";
   return `${ro.remote.commandRelease} ${minutes ?? 30} min`;
 }
 

@@ -98,11 +98,12 @@ export const ro = {
   lockedView: "Blocat",
   pinnedUntil: "Fixat până la",
   inboxWaiting: "în inbox",
-  liveTv: "Antena 3 Live",
+  liveTv: "TV Live",
   liveTvHint: "Pornit la cerere — nu e în rotație",
-  liveTvLoading: "Pornesc Antena 3…",
+  liveTvLoading: "Pornesc TV live…",
   liveTvFailed: "Nu pot porni fluxul.",
-  liveTvStuck: "Fluxul nu a pornit pe TV. Reîncearcă start_antena3_live.",
+  liveTvStuck: "Fluxul nu a pornit pe TV. Reîncearcă start_live_channel.",
+  liveTvCastOnly: "Pe Chromecast (cast nativ) — playerul din pagină e blocat de CORS.",
   customPageEmpty: "Pagina nu are conținut încă",
   remote: {
     notConfigured: "Telefonul nu este configurat.",
@@ -292,20 +293,32 @@ export function attemptsLeft(count: number): string {
 }
 
 export type CoreViewId = keyof typeof ro.views;
-/** Built-in or MCP custom page id (and on-demand `antena3`). */
+/** Built-in or MCP custom page id (and on-demand live channel overlays). */
 export type ViewId = string;
 
 export const VIEW_IDS: CoreViewId[] = ["today", "week", "momente", "vision", "home"];
+/** Canonical Antena 3 overlay id — kept for older pin/abandon callers. */
 export const LIVE_VIEW_ID = "antena3";
-export const RESERVED_VIEW_IDS = new Set<string>([...VIEW_IDS, LIVE_VIEW_ID]);
+export const LIVE_OVERLAY_IDS = new Set<string>(["antena3", "kanal-d", "digi24", "realitatea-plus"]);
+export const RESERVED_VIEW_IDS = new Set<string>([...VIEW_IDS, ...LIVE_OVERLAY_IDS]);
 
 export function isCoreViewId(id: string): id is CoreViewId {
   return (VIEW_IDS as readonly string[]).includes(id);
 }
 
+export function isLiveOverlayId(id: string | null | undefined): boolean {
+  return Boolean(id && LIVE_OVERLAY_IDS.has(id));
+}
+
 export function viewLabel(id: ViewId, pages: { id: string; title: string }[] = []): string {
   if (isCoreViewId(id)) return ro.views[id];
-  if (id === LIVE_VIEW_ID) return ro.liveTv;
+  if (isLiveOverlayId(id)) {
+    if (id === "antena3") return "Antena 3 Live";
+    if (id === "kanal-d") return "Kanal D Live";
+    if (id === "digi24") return "Digi 24 Live";
+    if (id === "realitatea-plus") return "Realitatea Plus Live";
+    return ro.liveTv;
+  }
   return pages.find((page) => page.id === id)?.title ?? id;
 }
 

@@ -58,12 +58,14 @@ describe("layout sizing + MCP tools", () => {
     assert.equal(suggestVisionPresentation({ kind: "wins", title: "Bravo, Zian!", body: "Ok" }).fontScale, "lg");
   });
 
-  it("registers preview/publish and pages/antena3 on the MCP catalog", () => {
+  it("registers preview/publish and pages/live tools on the MCP catalog", () => {
     for (const name of [
       "preview_layout",
       "publish_layout",
       "upsert_page",
       "delete_page",
+      "start_live_channel",
+      "stop_live_channel",
       "start_antena3_live",
       "stop_antena3_live",
     ]) {

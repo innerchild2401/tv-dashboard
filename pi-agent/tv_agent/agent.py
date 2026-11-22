@@ -80,8 +80,13 @@ def cycle(config: Config, memory: Memory, started: float) -> None:
     def do_cast_recover() -> None:
         load(config, relaunch=True)
 
-    def do_play_hls() -> None:
-        play_hls(config)
+    def do_play_hls(url: str | None = None, title: str | None = None) -> None:
+        kwargs: dict[str, str] = {}
+        if isinstance(url, str) and url.startswith("https://"):
+            kwargs["url"] = url
+        if isinstance(title, str) and title.strip():
+            kwargs["title"] = title.strip()[:80]
+        play_hls(config, **kwargs)
 
     def do_heartbeat(payload: dict[str, object]) -> None:
         request_json("POST", f"{config.server_url.rstrip('/')}/api/pi/heartbeat", config.pi_token, payload)
@@ -119,7 +124,19 @@ def fetch_commands(config: Config) -> list[Command]:
         if kind not in {"cast_now", "release", "restart_service", "cast_hls"}:
             continue
         minutes = item.get("minutes")
-        found.append(Command(id=str(item.get("id") or ""), kind=str(kind), minutes=minutes if isinstance(minutes, int) else None))
+        raw_url = item.get("url")
+        raw_title = item.get("title")
+        url = raw_url.strip() if isinstance(raw_url, str) and raw_url.strip().startswith("https://") else None
+        title = raw_title.strip()[:80] if isinstance(raw_title, str) and raw_title.strip() else None
+        found.append(
+            Command(
+                id=str(item.get("id") or ""),
+                kind=str(kind),
+                minutes=minutes if isinstance(minutes, int) else None,
+                url=url,
+                title=title,
+            )
+        )
     return found
 
 

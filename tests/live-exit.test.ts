@@ -19,7 +19,17 @@ describe("live exit / stuck recovery", () => {
 
   it("detects when the server left the Antena 3 overlay", () => {
     assert.equal(
-      isLiveOverlay({ currentView: LIVE_VIEW_ID, live: { provider: "antena3", pageUrl: "", streamUrl: "", label: "", hint: "" } }),
+      isLiveOverlay({
+        currentView: LIVE_VIEW_ID,
+        live: { provider: "antena3", pageUrl: "", streamUrl: "", label: "", hint: "", inPageOk: true },
+      }),
+      true,
+    );
+    assert.equal(
+      isLiveOverlay({
+        currentView: "digi24",
+        live: { provider: "digi24", pageUrl: "", streamUrl: "", label: "", hint: "", inPageOk: false },
+      }),
       true,
     );
     assert.equal(serverLeftLive({ currentView: "today", live: null, hold: "rotate" }), true);
@@ -52,6 +62,16 @@ describe("live exit / stuck recovery", () => {
         playing: true,
         startedAtMs,
         nowMs: startedAtMs + LIVE_PLAY_START_MS + 5_000,
+      }),
+      false,
+    );
+    assert.equal(
+      shouldAbandonStuckLive({
+        onLive: true,
+        playing: false,
+        startedAtMs,
+        nowMs: startedAtMs + LIVE_PLAY_START_MS + 5_000,
+        inPageOk: false,
       }),
       false,
     );

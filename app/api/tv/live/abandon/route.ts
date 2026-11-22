@@ -1,4 +1,4 @@
-import { LIVE_VIEW_ID } from "@/i18n/ro";
+import { isLiveOverlayId } from "@/i18n/ro";
 import { authorizeTv } from "@/lib/auth/tv";
 import { ROTATE_CONTROL } from "@/lib/remote/hold";
 import { publishChange } from "@/lib/remote/publish";
@@ -7,8 +7,9 @@ import { readControl, writeControl } from "@/lib/remote/store";
 export const dynamic = "force-dynamic";
 
 /**
- * TV-token escape hatch: if Antena 3 pin is stuck (black screen / hung player),
+ * TV-token escape hatch: if an in-page live pin is stuck (black screen / hung player),
  * the Cast client can clear only that overlay and return to rotation.
+ * Cast-only channels (CORS-blocked) must not call this — Pi MediaController owns playback.
  */
 export async function POST(request: Request) {
   const header = request.headers.get("authorization") ?? "";
@@ -21,10 +22,10 @@ export async function POST(request: Request) {
   try {
     const current = await readControl();
     const active =
-      current.mode === "pinned" && current.viewId === LIVE_VIEW_ID;
+      current.mode === "pinned" && isLiveOverlayId(current.viewId);
     if (!active) {
       return Response.json(
-        { ok: true, cleared: false, reason: "Antena 3 was not pinned" },
+        { ok: true, cleared: false, reason: "live TV was not pinned" },
         { headers: { "Cache-Control": "no-store" } },
       );
     }
