@@ -9,7 +9,7 @@ IDLE_APP_ID = "E8C28D3C"
 DASH_APP_ID = "84912283"
 MEDIA_APP_ID = "CC1AD845"  # Default Media Receiver (cast_hls)
 # Bump when cast-matching / no-flash rules change so /remote/system shows the Pi got the update.
-AGENT_VERSION = "8"
+AGENT_VERSION = "9"
 
 
 @dataclass(frozen=True)
@@ -35,6 +35,9 @@ class Command:
     id: str
     kind: str
     minutes: int | None = None
+    # Optional HLS master + title for cast_hls (dashboard enriches from live pin).
+    url: str | None = None
+    title: str | None = None
 
 
 @dataclass
@@ -63,6 +66,8 @@ class Step:
     play_hls: bool = False
     # Hands-off window applied only after play_hls succeeds (see loop).
     play_hls_minutes: int = 60
+    play_hls_url: str | None = None
+    play_hls_title: str | None = None
     # True for explicit cast_now: quit foreign apps (esp. DMR) and retry DashCast.
     cast_recover: bool = False
     heartbeat: bool = False
@@ -145,6 +150,8 @@ def plan(
     forced = False
     play_hls = False
     play_hls_minutes = 60
+    play_hls_url: str | None = None
+    play_hls_title: str | None = None
     restart = False
     for command in commands:
         if command.kind == "restart_service":
@@ -164,6 +171,10 @@ def plan(
         elif command.kind == "cast_hls":
             play_hls = True
             play_hls_minutes = command.minutes if command.minutes and 1 <= command.minutes <= 180 else 60
+            if isinstance(command.url, str) and command.url.startswith("https://"):
+                play_hls_url = command.url.strip()
+            if isinstance(command.title, str) and command.title.strip():
+                play_hls_title = command.title.strip()[:80]
             # Do not set hands_off until media actually plays — a failed DMR
             # launch must not block DashCast recovery for up to 60 minutes.
             _reset_idle(memory)
@@ -172,6 +183,8 @@ def plan(
     # Panel recovery wins: never play HLS in the same cycle as cast_now.
     if forced:
         play_hls = False
+        play_hls_url = None
+        play_hls_title = None
 
     if not sight.looked:
         _freeze_idle(memory, now)
@@ -224,11 +237,14 @@ def plan(
             auto = True
             notes.append("refresh")
     cast = (forced and sight.found) or auto
+    will_play = play_hls and sight.found and not cast
     return Step(
         receiver=receiver,
         cast=cast,
-        play_hls=play_hls and sight.found and not cast,
+        play_hls=will_play,
         play_hls_minutes=play_hls_minutes,
+        play_hls_url=play_hls_url if will_play else None,
+        play_hls_title=play_hls_title if will_play else None,
         cast_recover=forced and sight.found,
         heartbeat=now - memory.last_heartbeat >= settings.heartbeat_seconds,
         restart=restart,

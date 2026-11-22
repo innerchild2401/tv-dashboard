@@ -1,4 +1,4 @@
-import { LIVE_VIEW_ID, RESERVED_VIEW_IDS, VIEW_IDS, isCoreViewId, ro, type ViewId } from "@/i18n/ro";
+import { LIVE_OVERLAY_IDS, RESERVED_VIEW_IDS, VIEW_IDS, isCoreViewId, ro, type ViewId } from "@/i18n/ro";
 import { configSchema } from "@/lib/schemas";
 import type { DashboardConfig } from "@/lib/state/types";
 
@@ -8,7 +8,7 @@ export function parseConfig(input: unknown): { ok: true; config: DashboardConfig
   const ids = parsed.data.views.map((view) => view.id);
   if (new Set(ids).size !== ids.length) return { ok: false, reason: ro.remote.invalid };
   if (VIEW_IDS.some((id) => !ids.includes(id))) return { ok: false, reason: ro.remote.invalid };
-  if (ids.includes(LIVE_VIEW_ID)) return { ok: false, reason: ro.remote.invalid };
+  if (ids.some((id) => LIVE_OVERLAY_IDS.has(id))) return { ok: false, reason: ro.remote.invalid };
   const pageIds = new Set(parsed.data.pages.map((page) => page.id));
   if (pageIds.size !== parsed.data.pages.length) return { ok: false, reason: ro.remote.invalid };
   for (const page of parsed.data.pages) {
@@ -47,12 +47,12 @@ export function personSlug(name: string, taken: string[]): string {
 
 const VIEW_ID_RE = /^[a-z][a-z0-9-]{0,39}$/;
 
-/** Rotating / phone-remote view ids — excludes on-demand Antena 3 (use start_antena3_live). */
+/** Rotating / phone-remote view ids — excludes on-demand live overlays (use start_live_channel). */
 export function isViewId(value: string): value is ViewId {
-  return VIEW_ID_RE.test(value) && value !== LIVE_VIEW_ID;
+  return VIEW_ID_RE.test(value) && !LIVE_OVERLAY_IDS.has(value);
 }
 
-/** display_control.view_id values the TV must honor, including the Antena 3 overlay pin. */
+/** display_control.view_id values the TV must honor, including live overlay pins. */
 export function isControlViewId(value: string): value is ViewId {
   return VIEW_ID_RE.test(value);
 }

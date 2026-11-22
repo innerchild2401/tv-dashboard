@@ -1,5 +1,6 @@
 import { createServiceClient, databaseConfigured } from "@/lib/db/server";
 import { ro } from "@/i18n/ro";
+import { LIVE_CHANNELS, liveChannelFromViewId } from "@/lib/live/channels";
 import {
   memoryAppendLog,
   memoryLog,
@@ -21,6 +22,7 @@ import {
   type PiSnapshot,
   type QueuedCommand,
 } from "@/lib/pi/watch";
+import { readControl } from "@/lib/remote/store";
 
 function devMemory(): boolean {
   return !databaseConfigured() && process.env.NODE_ENV !== "production";
@@ -77,7 +79,7 @@ export async function saveHeartbeat(
 export async function pullCommands(now = new Date()): Promise<QueuedCommand[]> {
   if (!databaseConfigured()) {
     if (!devMemory()) return [];
-    const taken = memoryPull(now);
+    const taken = await enrichCastHls(memoryPull(now));
     if (taken.length) memoryAppendLog(taken.map((command) => ({ at: now.toISOString(), line: `livrat: ${commandLabel(command.kind, command.minutes)}` })));
     return taken;
   }
@@ -100,11 +102,28 @@ export async function pullCommands(now = new Date()): Promise<QueuedCommand[]> {
     .select("id");
   if (updated.error) throw new Error("db");
   const delivered = new Set((updated.data ?? []).map((row) => row.id));
-  const taken = rows.filter((row) => delivered.has(row.id)).map(commandFrom);
+  const taken = await enrichCastHls(rows.filter((row) => delivered.has(row.id)).map(commandFrom));
   const cutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
   await db.from("pi_commands").delete().eq("status", "delivered").lt("delivered_at", cutoff);
   if (taken.length) await appendDbLog(taken.map((command) => ({ at: now.toISOString(), line: `livrat: ${commandLabel(command.kind, command.minutes)}` })));
   return taken;
+}
+
+/** Attach current live pin stream URL/title so Pi ≥9 casts the right channel. */
+async function enrichCastHls(commands: QueuedCommand[]): Promise<QueuedCommand[]> {
+  if (!commands.some((command) => command.kind === "cast_hls")) return commands;
+  let channel = LIVE_CHANNELS.antena3;
+  try {
+    const control = await readControl();
+    channel = liveChannelFromViewId(control.viewId) ?? LIVE_CHANNELS.antena3;
+  } catch {
+    // Fall back to Antena 3 URL — matches Pi hardcoded default.
+  }
+  return commands.map((command) =>
+    command.kind === "cast_hls"
+      ? { ...command, url: channel.streamUrl, title: channel.label }
+      : command,
+  );
 }
 
 export async function queueCommand(

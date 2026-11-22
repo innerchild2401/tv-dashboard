@@ -90,8 +90,12 @@ def stop_media_session() -> None:
         _close(cast, browser)
 
 
-def play_hls(config: Config, url: str = ANTENA3_HLS_URL) -> None:
-    """Cast Antena 3 HLS as native media with volume, then hold the sender session.
+def play_hls(
+    config: Config,
+    url: str = ANTENA3_HLS_URL,
+    title: str = "Antena 3 Live",
+) -> None:
+    """Cast a live HLS master as native media with volume, then hold the sender session.
 
     Chosen path (HH-32): hardened ``pychromecast`` ``MediaController`` on the
     Default Media Receiver. Alternatives considered and skipped:
@@ -108,10 +112,14 @@ def play_hls(config: Config, url: str = ANTENA3_HLS_URL) -> None:
 
     HH-35: keep the Cast connection open until ``stop_media_session`` (stop /
     pin expiry). Journal peeks on this same socket prove sustained PLAYING.
+
+    HH-36: ``url`` / ``title`` come from the dashboard cast_hls command so Kanal D,
+    Digi 24, Realitatea Plus, and Antena 3 share one MediaController path.
     """
     stop_media_session()
     cast, browser = _connect(config)
     transferred = False
+    media_title = (title or "TV Live").strip()[:80] or "TV Live"
     try:
         if cast is None:
             raise RuntimeError("chromecast not found")
@@ -123,7 +131,7 @@ def play_hls(config: Config, url: str = ANTENA3_HLS_URL) -> None:
             "application/x-mpegURL",
             stream_type="LIVE",
             autoplay=True,
-            title="Antena 3",
+            title=media_title,
         )
         cast.media_controller.block_until_active(timeout=timeout)
         _ensure_audible_volume(cast)

@@ -33,7 +33,8 @@ class LoopInput:
     sight: Sight
     cast: Callable[[], None]
     cast_recover: Callable[[], None] | None = None
-    play_hls: Callable[[], None] | None = None
+    # Optional url/title kwargs for multi-channel cast_hls (Pi ≥9).
+    play_hls: Callable[..., None] | None = None
     heartbeat: Callable[[dict[str, object]], None] = lambda _payload: None
     wall_iso: str = ""
     uptime_seconds: int = 0
@@ -48,7 +49,12 @@ def run_once(step_input: LoopInput) -> None:
     decided = plan(memory, sight, step_input.commands, settings, step_input.now, step_input.expected_url)
     if decided.play_hls and step_input.play_hls is not None:
         try:
-            step_input.play_hls()
+            kwargs: dict[str, str] = {}
+            if decided.play_hls_url:
+                kwargs["url"] = decided.play_hls_url
+            if decided.play_hls_title:
+                kwargs["title"] = decided.play_hls_title
+            step_input.play_hls(**kwargs)
         except Exception:
             # Never leave a dead Default Media Receiver: clear hands-off and restore DashCast.
             memory.hands_off_until = 0.0

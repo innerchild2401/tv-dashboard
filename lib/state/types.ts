@@ -212,11 +212,13 @@ export type CustomPageModel = {
 };
 
 export type LiveModel = {
-  provider: "antena3";
+  provider: string;
   pageUrl: string;
   streamUrl: string;
   label: string;
   hint: string;
+  /** False when browser CORS blocks in-page HLS — Pi cast is authoritative; never abandon on stall. */
+  inPageOk: boolean;
 };
 
 export type HomeStickyKind = "task" | "shopping" | "message";

@@ -37,9 +37,9 @@ def tick(memory, now, sight, commands, casts, beats, settings=None, hls=None, re
         else:
             casts.append(now)
 
-    def play_hls():
+    def play_hls(**kwargs):
         if hls is not None:
-            hls.append(now)
+            hls.append({"now": now, **kwargs} if kwargs else now)
 
     def heartbeat(payload):
         beats.append(payload)
@@ -238,6 +238,24 @@ class WatchdogTest(unittest.TestCase):
         dmr = Sight(looked=True, found=True, app_id="CC1AD845", app_name="Default Media Receiver")
         tick(memory, 30, dmr, [], casts, beats, hls=hls)
         self.assertEqual(casts, [])
+
+    def test_cast_hls_passes_url_and_title(self):
+        showing = Sight(looked=True, found=True, app_id=DASH_APP_ID, app_name="DashCast", dash_url=URL)
+        casts = []
+        hls = []
+        beats = []
+        memory = Memory()
+        url = "https://stream1.kanald.ro/iphone/knd-live.m3u8"
+        tick(
+            memory,
+            0,
+            showing,
+            [Command("1", "cast_hls", 15, url=url, title="Kanal D Live")],
+            casts,
+            beats,
+            hls=hls,
+        )
+        self.assertEqual(hls, [{"now": 0, "url": url, "title": "Kanal D Live"}])
 
     def test_cast_hls_holds_through_backdrop_until_pin_expiry(self):
         dash = Sight(looked=True, found=True, app_id=DASH_APP_ID, app_name="DashCast", dash_url=URL)

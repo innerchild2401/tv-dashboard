@@ -11,6 +11,8 @@ export const TOOL_NAMES = [
   "delete_spotlight",
   "upsert_page",
   "delete_page",
+  "start_live_channel",
+  "stop_live_channel",
   "start_antena3_live",
   "stop_antena3_live",
   "preview_layout",

@@ -81,6 +81,38 @@ export function LiveView({
   });
 
   useEffect(() => {
+    // Cast-only (CORS-blocked) channels: never start in-page HLS, never report stuck.
+    // Pi MediaController / Default Media Receiver owns the real audio+video path.
+    if (view.inPageOk === false) {
+      stuckSent.current = true;
+      engineRef.current = "none";
+      setEngine("none");
+      setMode("stream");
+      setPlaying(true);
+      notifyPlaying(true);
+      setStatus(`${view.label} · ${ro.liveTvCastOnly}`);
+      setDiag((prev) => ({ ...prev, host: streamHost(view.streamUrl), paused: false }));
+      if (typeof window !== "undefined") {
+        window.__livePlayer = {
+          currentTime: 0,
+          paused: false,
+          muted: false,
+          volume: 1,
+          readyState: 0,
+          mode: "stream",
+          playing: true,
+          engine: "none",
+          ua: detectCastUa().label,
+          buildId,
+          host: streamHost(view.streamUrl),
+          err: "cast-only",
+        };
+      }
+      return () => {
+        if (typeof window !== "undefined" && window.__livePlayer) delete window.__livePlayer;
+      };
+    }
+
     const video = videoRef.current;
     if (!video || mode !== "stream") return;
 
@@ -319,7 +351,9 @@ export function LiveView({
       video.load();
       if (typeof window !== "undefined" && window.__livePlayer) delete window.__livePlayer;
     };
-  }, [mode, view.streamUrl, view.label, buildId]);
+  }, [mode, view.streamUrl, view.label, view.inPageOk, buildId]);
+
+  const castOnly = view.inPageOk === false;
 
   return (
     <section
@@ -330,6 +364,7 @@ export function LiveView({
       data-live-mode={mode}
       data-live-engine={engine}
       data-live-muted={muted ? "1" : "0"}
+      data-live-cast-only={castOnly ? "1" : "0"}
       data-build-id={buildId}
     >
       <header className="live-tv-bar">
@@ -342,8 +377,9 @@ export function LiveView({
         {currentTime.toFixed(1)}s · {diag.paused ? "paused" : "play"} ·{" "}
         {muted ? "MUTE" : "SUNET"} · vol={diag.volume.toFixed(1)} · rs={diag.readyState}
         {err ? ` · err=${err}` : ""} · {diag.shortUa}
+        {castOnly ? " · cast-only" : ""}
       </p>
-      {mode === "stream" ? (
+      {mode === "stream" && !castOnly ? (
         <video
           ref={videoRef}
           className="live-tv-video"
@@ -354,6 +390,11 @@ export function LiveView({
           disablePictureInPicture
           disableRemotePlayback
         />
+      ) : null}
+      {castOnly ? (
+        <p className="live-tv-fallback" role="status">
+          {ro.liveTvCastOnly}
+        </p>
       ) : null}
       {mode === "failed" ? (
         <p className="live-tv-fallback" role="alert">

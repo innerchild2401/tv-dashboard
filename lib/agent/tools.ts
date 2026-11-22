@@ -43,13 +43,20 @@ import { plainText } from "@/lib/remote/text";
 import { publishChange } from "@/lib/remote/publish";
 import { cardSchema, paletteTokenSchema } from "@/lib/schemas";
 import { endOfZonedDay, zonedParts, zonedTimeToUtc } from "@/lib/time/bucharest";
-import { LIVE_VIEW_ID, RESERVED_VIEW_IDS } from "@/i18n/ro";
+import { isLiveOverlayId, RESERVED_VIEW_IDS } from "@/i18n/ro";
 import { parseVisionDraft, suggestVisionPresentation, type VisionLayoutDraft, type VisionLayoutPlacement } from "@/lib/agent/layout";
 import { ROTATE_CONTROL, type DisplayControl } from "@/lib/remote/hold";
 import { packVisionCards } from "@/lib/views/pack";
-import { ANTENA3_STREAM_URL } from "@/lib/live/antena3";
+import {
+  LIVE_CAST_URL_MIN_VERSION,
+  LIVE_CHANNEL_IDS,
+  isLiveChannelId,
+  liveChannel,
+  piSupportsLiveCastUrl,
+  type LiveChannelId,
+} from "@/lib/live/channels";
 import { probeHlsUrl } from "@/lib/live/playback";
-import { queueCommand } from "@/lib/pi/store";
+import { queueCommand, readPi } from "@/lib/pi/store";
 
 const READS = new Set<ToolName>([
   "get_dashboard_state",
@@ -75,7 +82,7 @@ const designInput = z.object({
   viewId: z
     .enum(["today", "week", "momente", "vision", "home", "custom-page", "pages", "antena3", "live"])
     .optional()
-    .describe("Optional view id. Omit for every rotating view plus custom pages and Antena 3 live."),
+    .describe("Optional view id. Omit for every rotating view plus custom pages and live TV."),
 });
 const pageInput = z.object({
   id: z
@@ -111,7 +118,19 @@ const liveStartInput = z.object({
     .min(1)
     .max(180)
     .optional()
-    .describe("How long to keep Antena 3 before auto-return. Default 60. Soft pin + Pi media hands-off window."),
+    .describe("How long to keep live TV before auto-return. Default 60. Soft pin + Pi media hands-off window."),
+});
+const liveChannelStartInput = z.object({
+  channel: z
+    .enum(LIVE_CHANNEL_IDS)
+    .describe("Live channel id: antena3 | kanal-d | digi24 | realitatea-plus. Not in default rotation."),
+  minutes: z
+    .number()
+    .int()
+    .min(1)
+    .max(180)
+    .optional()
+    .describe("How long to keep live TV before auto-return. Default 60. Soft pin + Pi media hands-off window."),
 });
 const cardInput = z.object({
   externalId: z.string().trim().min(1).max(200).describe("Stable idempotency key. The same value updates the existing card."),
@@ -357,17 +376,30 @@ export const TOOL_CATALOG: { name: ToolName; title: string; description: string;
     input: pageDeleteInput,
   },
   {
+    name: "start_live_channel",
+    title: "Start live TV channel",
+    description:
+      "On-demand only: soft-pin a live channel AND queue Pi cast_hls (Default Media Receiver via MediaController). channel: antena3 | kanal-d | digi24 | realitatea-plus. MUST NOT be in default rotation. Digi 24 & Realitatea Plus are cast-only (CORS blocks in-page). Prefer after Alex asks. Optional minutes (default 60, max 180). Non-Antena 3 needs tv-agent ≥9 for the correct stream URL.",
+    input: liveChannelStartInput,
+  },
+  {
+    name: "stop_live_channel",
+    title: "Stop live TV",
+    description:
+      "Leave any live channel, clear the soft pin, and queue Pi cast_now so tv-agent quits the media app and restores DashCast with retries.",
+    input: emptyInput,
+  },
+  {
     name: "start_antena3_live",
     title: "Start Antena 3 live",
     description:
-      "On-demand only: soft-pin Antena 3 in-page AND queue Pi cast_hls (native Chromecast media with volume — tv-agent ≥5 verifies PLAYING then hands off; on failure restores DashCast). MUST NOT be in default rotation. Prefer after Alex asks. Optional minutes (default 60, max 180).",
+      "Alias for start_live_channel({ channel: \"antena3\" }). Soft-pin + Pi cast_hls. MUST NOT be in default rotation. Optional minutes (default 60, max 180).",
     input: liveStartInput,
   },
   {
     name: "stop_antena3_live",
     title: "Stop Antena 3 live",
-    description:
-      "Leave Antena 3 live, clear the soft pin, and queue Pi cast_now so tv-agent quits the media app and restores DashCast with retries.",
+    description: "Alias for stop_live_channel — clears any live pin and restores DashCast.",
     input: emptyInput,
   },
   {
@@ -505,8 +537,13 @@ async function dispatch(store: AgentStore, name: ToolName, args: unknown, now: D
   if (name === "delete_spotlight") return deleteSpotlight(store, args, now);
   if (name === "upsert_page") return upsertPage(store, args);
   if (name === "delete_page") return deletePage(store, args);
-  if (name === "start_antena3_live") return startAntena3Live(store, args, now);
-  if (name === "stop_antena3_live") return stopAntena3Live(store, now);
+  if (name === "start_live_channel") return startLiveChannel(store, args, now);
+  if (name === "stop_live_channel") return stopLiveChannel(store, now);
+  if (name === "start_antena3_live") {
+    const base = args && typeof args === "object" && !Array.isArray(args) ? (args as Record<string, unknown>) : {};
+    return startLiveChannel(store, { ...base, channel: "antena3" }, now);
+  }
+  if (name === "stop_antena3_live") return stopLiveChannel(store, now);
   if (name === "preview_layout") return previewLayout(store, args, now);
   if (name === "publish_layout") return publishLayout(store, now);
   if (name === "set_recap") return setRecap(store, args, now);
@@ -572,8 +609,9 @@ async function stateOf(store: AgentStore, now: Date): Promise<Outcome> {
           fetchedAt: metric.fetchedAt,
         })),
         live: {
-          active: control.mode === "pinned" && control.viewId === "antena3",
-          viewId: "antena3",
+          active: control.mode === "pinned" && isLiveOverlayId(control.viewId),
+          viewId: isLiveOverlayId(control.viewId) ? control.viewId : null,
+          channel: isLiveChannelId(control.viewId) ? control.viewId : null,
           pinnedUntil: control.pinnedUntil,
         },
       },
@@ -690,9 +728,11 @@ function schemaOf(): Outcome {
         },
         live: {
           viewId: "antena3",
-          tools: ["start_antena3_live", "stop_antena3_live"],
+          channels: LIVE_CHANNEL_IDS,
+          tools: ["start_live_channel", "stop_live_channel", "start_antena3_live", "stop_antena3_live"],
           description:
-            "On-demand Antena 3 CNN live with sound. Not in default rotation. Soft in-page pin (secondary) + Pi cast_hls native media (tv-agent ≥5 verifies PLAYING + volume; failure restores DashCast). stop queues cast_now. Free HLS only (no VAST/IMA page iframe).",
+            "On-demand live TV (antena3, kanal-d, digi24, realitatea-plus). Not in default rotation. Soft in-page pin (secondary when CORS allows) + Pi cast_hls native media (tv-agent ≥9 for non-Antena URLs). digi24 & realitatea-plus are cast-only (CORS). stop_live_channel / stop_antena3_live queues cast_now. Free HLS only (no VAST/IMA page iframe).",
+          example: { channel: "kanal-d", minutes: 60 },
         },
         home: {
           viewId: "home",
@@ -769,7 +809,7 @@ function schemaOf(): Outcome {
           "Victorii multi-card: preview_layout (PNG 1280×720) → publish_layout. Overlaps auto-pack. autoSize sizes from message length.",
           "Acasă post-its: tasks via upsert_task/delete_task, groceries via shopping_add/shopping_check/shopping_delete, messages via upsert_message/delete_message.",
           "Call get_view_design (or get_schema.design) before editing a view. Stay inside constraints — no free-form HTML.",
-          "Custom pages: upsert_page / delete_page. Antena 3 live: start_antena3_live / stop_antena3_live only when Alex asks — never default rotation.",
+          "Custom pages: upsert_page / delete_page. Live TV: start_live_channel / stop_live_channel (aliases start_antena3_live / stop_antena3_live) only when Alex asks — never default rotation.",
         ],
       },
     }),
@@ -1608,47 +1648,83 @@ async function deletePage(store: AgentStore, args: unknown): Promise<Outcome> {
   return done(success(id), { config: previous });
 }
 
-async function startAntena3Live(store: AgentStore, args: unknown, now: Date): Promise<Outcome> {
-  const input = read(liveStartInput, args);
+async function startLiveChannel(store: AgentStore, args: unknown, now: Date): Promise<Outcome> {
+  const input = read(liveChannelStartInput, args);
   if (!input.ok) return input.outcome;
+  const channelId = input.value.channel as LiveChannelId;
+  const channel = liveChannel(channelId);
   const current = await store.control();
-  if (holding(current, now) && current.viewId !== LIVE_VIEW_ID) return no("the phone is holding the screen");
+  if (holding(current, now) && !isLiveOverlayId(current.viewId)) return no("the phone is holding the screen");
   const minutes = input.value.minutes ?? 60;
   const next: DisplayControl = {
     mode: "pinned",
-    viewId: LIVE_VIEW_ID,
+    viewId: channel.viewId,
     pinnedUntil: new Date(now.getTime() + minutes * 60_000).toISOString(),
     dimmed: current.dimmed,
   };
   await store.putControl(next);
   const warnings = [
-    "soft in-page pin (secondary) + Pi cast_hls native media when tv-agent ≥5",
+    `${channel.label}: soft pin + Pi cast_hls (Default Media Receiver)`,
     "Pi verifies PLAYING/BUFFERING + volume; on failure quits media and restores DashCast",
     "keep dashcast_force=false on the Pi",
     "TV soft-reloads when /api/state buildId changes (Cast JS cache)",
-    "if in-page stream stalls ~12s the TV abandons the pin and returns to rotation",
   ];
-  const probe = await probeHlsUrl(ANTENA3_STREAM_URL);
-  if (!probe.ok || !probe.looksLikeHls) {
-    warnings.push("HLS master was not reachable from the server — TV may show the stuck fallback");
-  }
-  const queued = await queueCommand("cast_hls", minutes, now);
-  if (!queued.ok) {
-    warnings.push("Pi cast_hls was not queued — in-page player only until tv-agent ≥5 is installed");
+  if (channel.inPageOk) {
+    warnings.push("if in-page stream stalls ~12s the TV abandons the pin and returns to rotation");
   } else {
-    warnings.push("queued cast_hls for Pi MediaController (verify + volume; DashCast restore on fail)");
+    warnings.push("cast-only channel (CORS) — in-page stall must NOT abandon or quit MediaController");
   }
-  return done(success(LIVE_VIEW_ID, warnings), {
+  const probe = await probeHlsUrl(channel.streamUrl);
+  if (!probe.ok || !probe.looksLikeHls) {
+    warnings.push("HLS master was not reachable from the server — cast may fail");
+  }
+
+  // Antena 3: always queue cast_hls (Pi ≤8 hardcodes that URL).
+  // Other channels: only when Pi ≥9 understands command.url — otherwise old Pi would cast Antena 3.
+  let queueCast = channelId === "antena3";
+  if (!queueCast) {
+    try {
+      const pi = await readPi();
+      const version = pi.status?.version ?? null;
+      if (piSupportsLiveCastUrl(version)) {
+        queueCast = true;
+      } else {
+        warnings.push(
+          `Pi tv-agent ${version ?? "unknown"} < ${LIVE_CAST_URL_MIN_VERSION} — cast_hls not queued for ${channelId} (would play Antena 3). Update Pi after current live ends.`,
+        );
+        if (!channel.inPageOk) {
+          warnings.push("cast-only channel needs Pi ≥9 — soft pin alone will not show video on the TV");
+        }
+      }
+    } catch {
+      warnings.push("could not read Pi version — cast_hls skipped for non-Antena channel");
+    }
+  }
+
+  if (queueCast) {
+    const queued = await queueCommand("cast_hls", minutes, now);
+    if (!queued.ok) {
+      warnings.push(
+        channel.inPageOk
+          ? "Pi cast_hls was not queued — in-page player only"
+          : "Pi cast_hls was not queued — cast-only channel will stay dark until Pi is reachable",
+      );
+    } else {
+      warnings.push("queued cast_hls for Pi MediaController (verify + volume; DashCast restore on fail)");
+    }
+  }
+
+  return done(success(channel.viewId, warnings), {
     control: current,
     expectControl: next,
   });
 }
 
-async function stopAntena3Live(store: AgentStore, now: Date): Promise<Outcome> {
+async function stopLiveChannel(store: AgentStore, now: Date): Promise<Outcome> {
   const current = await store.control();
-  if (holding(current, now) && current.viewId !== LIVE_VIEW_ID) return no("the phone is holding the screen");
-  if (current.viewId !== LIVE_VIEW_ID && current.mode === "rotate") {
-    return done(success(null, ["Antena 3 was not active"]), null);
+  if (holding(current, now) && !isLiveOverlayId(current.viewId)) return no("the phone is holding the screen");
+  if (!isLiveOverlayId(current.viewId) && current.mode === "rotate") {
+    return done(success(null, ["live TV was not active"]), null);
   }
   const next: DisplayControl = { ...ROTATE_CONTROL, dimmed: current.dimmed };
   await store.putControl(next);
@@ -1673,7 +1749,7 @@ async function pinView(store: AgentStore, args: unknown, now: Date): Promise<Out
     if (!card) return no("that card was not found");
     viewId = card.viewId;
   } else if (input.value.cardId) warnings.push("viewId was used");
-  if (viewId === LIVE_VIEW_ID) return no("use start_antena3_live / stop_antena3_live for Antena 3");
+  if (isLiveOverlayId(viewId)) return no("use start_live_channel / stop_live_channel for live TV");
   if (!views.some((view) => view.id === viewId)) return no("that view does not exist");
   const minutes = input.value.minutes ?? 10;
   const next: DisplayControl = {
